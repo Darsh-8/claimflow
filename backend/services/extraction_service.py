@@ -60,7 +60,12 @@ async def extract_fields(raw_text: str) -> dict:
                 fields.setdefault(category, {})[key] = value.strip()
 
         # ── Patient Information ──
+        # Try specific label first
         m = re.search(r"(?:Patient\s*Name|Name\s*of\s*Patient|Patient)\s*[:\-]\s*([A-Za-z.\s]+?)(?:\s+Age|\s*$|\s*,)", text, re.IGNORECASE)
+        if not m:
+            # Fallback: capture any capitalized name sequence right before "Age:"
+            # Handles garbled OCR labels like "DMme:", "Nme:", etc.
+            m = re.search(r"(?:^|[:\-]\s*|me:\s*)([A-Z][A-Za-z.\s]{3,50}?)\s+Age\s*[:\-]", text, re.MULTILINE)
         add("patient", "name", m.group(1) if m else None)
 
         m = re.search(r"Age\s*[:\-]\s*(\d+)\s*(?:years?|yrs?|Y)?", text, re.IGNORECASE)
