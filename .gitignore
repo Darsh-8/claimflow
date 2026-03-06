@@ -65,3 +65,25 @@ tests/uploads/
 .coverage
 coverage.xml
 htmlcov/
+
+# Debug / scratch scripts (root level)
+/create_test_image.py
+/debug_extraction_local.py
+/test_kimi_ocr.py
+/verify_backend.py
+
+# Debug / scratch scripts (backend level)
+backend/debug_extraction_local.py
+backend/run_validation_test.py
+
+# Orphan / duplicate source directories
+/src/
+
+# Root-level stale files
+/package-lock.json
+/download.jpg
+/original.jpg
+
+# Documentation (use GitHub Wiki or Releases instead)
+*.pdf
+!docs/**/*.pdf

@@ -1,0 +1,15 @@
+# CODEOWNERS — defines who reviews PRs for each area
+# See: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owner for everything
+* @Darsh-8
+
+# Backend (Python / FastAPI)
+/backend/ @Darsh-8
+
+# Frontend (React / TypeScript)
+/frontend/ @Darsh-8
+
+# CI/CD and config
+/.github/ @Darsh-8
+.gitignore @Darsh-8
