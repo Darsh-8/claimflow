@@ -49,30 +49,164 @@ async def extract_fields(raw_text: str) -> dict:
 
     # Pre-parse fallback in case API calls fail
     def fallback_extract(text: str) -> dict:
-        fields = {}
-        m_name = re.search(r"(?:Patient Name|Name|Patient):\s*([A-Za-z\s]+)", text, re.IGNORECASE)
-        if m_name:
-            fields.setdefault("patient", {})["name"] = m_name.group(1).strip()
-        m_age = re.search(r"Age:\s*(\d+)", text, re.IGNORECASE)
-        if m_age:
-            fields.setdefault("patient", {})["age"] = m_age.group(1).strip()
-        m_hosp = re.search(r"Hospital(?: Name)?:\s*([A-Za-z\w\s]+)", text, re.IGNORECASE)
-        if m_hosp:
-            fields.setdefault("hospital", {})["name"] = m_hosp.group(1).strip()
-        m_diag = re.search(r"(?:Diagnosis|Condition):\s*([A-Za-z\s,-]+)", text, re.IGNORECASE)
-        if m_diag:
-            fields.setdefault("clinical", {})["diagnosis"] = m_diag.group(1).strip()
-        m_amt = re.search(r"(?:Total|Amount|Bill|Rs\.?|INR)\s*[:\.]?\s*([\d,]+)", text, re.IGNORECASE)
-        if m_amt:
-            fields.setdefault("financial", {})["bill_amount"] = m_amt.group(1).strip()
-        m_date = re.search(r"(?:Date|Admission Date):\s*([\d/:-]+)", text, re.IGNORECASE)
-        if m_date:
-            fields.setdefault("financial", {})["admission_date"] = m_date.group(1).strip()
-        
+        """
+        Comprehensive regex-based extraction fallback.
+        Captures patient, hospital, clinical, financial, and policy data.
+        """
+        fields: dict = {}
+
+        def add(category: str, key: str, value: str | None):
+            if value and value.strip():
+                fields.setdefault(category, {})[key] = value.strip()
+
+        # ── Patient Information ──
+        m = re.search(r"(?:Patient\s*Name|Name\s*of\s*Patient|Patient)\s*[:\-]\s*([A-Za-z.\s]+?)(?:\s+Age|\s*$|\s*,)", text, re.IGNORECASE)
+        add("patient", "name", m.group(1) if m else None)
+
+        m = re.search(r"Age\s*[:\-]\s*(\d+)\s*(?:years?|yrs?|Y)?", text, re.IGNORECASE)
+        add("patient", "age", m.group(1) if m else None)
+
+        m = re.search(r"(?:Sex|Gender)\s*[:\-]\s*(Male|Female|M|F|Other|Transgender)", text, re.IGNORECASE)
+        add("patient", "gender", m.group(1) if m else None)
+
+        m = re.search(r"(?:Weight|Wt|WT)\s*[:\-]\s*([\d.]+\s*(?:kg|lbs?)?)", text, re.IGNORECASE)
+        add("patient", "weight", m.group(1) if m else None)
+
+        m = re.search(r"(?:Height|Ht|HT)\s*[:\-]\s*([\d.]+\s*(?:cm|ft|m|inches?)?)", text, re.IGNORECASE)
+        add("patient", "height", m.group(1) if m else None)
+
+        m = re.search(r"(?:Blood\s*Group|Blood\s*Type)\s*[:\-]\s*([ABO]{1,2}[+-]?)", text, re.IGNORECASE)
+        add("patient", "blood_group", m.group(1) if m else None)
+
+        m = re.search(r"(?:Phone|Mobile|Contact|Tel)\s*[:\-]\s*([\d\s+()-]{7,15})", text, re.IGNORECASE)
+        add("patient", "phone", m.group(1) if m else None)
+
+        m = re.search(r"(?:Patient\s*ID|MRN|MR\s*No|Reg\.?\s*No|UHID)\s*[:\-]\s*([\w\d/-]+)", text, re.IGNORECASE)
+        add("patient", "patient_id", m.group(1) if m else None)
+
+        m = re.search(r"(?:Father|Father'?s?\s*Name|S/O|D/O|W/O|C/O)\s*[:\-]\s*([A-Za-z.\s]+?)(?:\s*$|\s*,|\n)", text, re.IGNORECASE)
+        add("patient", "guardian_name", m.group(1) if m else None)
+
+        m = re.search(r"(?:Address|Addr|Residence)\s*[:\-]\s*(.+?)(?:\n|\r|$)", text, re.IGNORECASE)
+        add("patient", "address", m.group(1)[:200] if m else None)
+
+        # ── Hospital Information ──
+        # Try to capture hospital name from header lines (often the first non-empty line)
+        m = re.search(r"(?:Hospital(?:\s*Name)?|Nursing\s*Home|Medical\s*Centre|Medical\s*Center|Clinic)\s*[:\-]\s*([A-Za-z\w\s.&]+)", text, re.IGNORECASE)
+        if m:
+            add("hospital", "name", m.group(1))
+        else:
+            # Often the hospital name is the first prominent line
+            first_lines = [l.strip() for l in text.split("\n")[:3] if l.strip() and len(l.strip()) > 5]
+            for line in first_lines:
+                if any(kw in line.upper() for kw in ["HOSPITAL", "CLINIC", "MEDICAL", "NURSING", "HEALTH"]):
+                    add("hospital", "name", line[:100])
+                    break
+
+        m = re.search(r"(?:ROHINI|NABH|Registration)\s*(?:ID|No\.?|Number)\s*[:\-]\s*([\w\d/-]+)", text, re.IGNORECASE)
+        add("hospital", "registration_id", m.group(1) if m else None)
+
+        m = re.search(r"(?:Bed\s*No|Bed|Ward|Room)\s*[:\-]\s*([\w\d\s/-]+?)(?:\s*$|\s*,|\n)", text, re.IGNORECASE)
+        add("hospital", "bed_ward", m.group(1) if m else None)
+
+        # ── Doctor / Consultant ──
+        m = re.search(r"(?:Dr\.?\s*|Doctor\s*[:\-]\s*|Consultant\s*[:\-]\s*|Treated\s*by\s*[:\-]?\s*|Attending\s*Physician\s*[:\-]\s*)([A-Za-z.\s]+?)(?:\s*$|\s*,|\n|(?=\s*(?:MBBS|MD|MS|FRCS|MCh|DNB)))", text, re.IGNORECASE)
+        add("hospital", "treating_doctor", m.group(1) if m else None)
+
+        m = re.search(r"(?:Speciality|Specialty|Department|Dept)\s*[:\-]\s*([A-Za-z\s/&]+?)(?:\s*$|\s*,|\n)", text, re.IGNORECASE)
+        add("hospital", "department", m.group(1) if m else None)
+
+        # ── Clinical Data ──
+        m = re.search(r"(?:Diagnosis|Primary\s*Diagnosis|Final\s*Diagnosis|Condition|Disease)\s*[:\-]\s*(.+?)(?:\n|\r|$)", text, re.IGNORECASE)
+        add("clinical", "diagnosis", m.group(1)[:300] if m else None)
+
+        m = re.search(r"(?:ICD|ICD[\s-]*10|ICD[\s-]*Code)\s*[:\-]\s*([A-Z]\d{2,3}(?:\.\d{1,2})?(?:\s*,\s*[A-Z]\d{2,3}(?:\.\d{1,2})?)*)", text, re.IGNORECASE)
+        add("clinical", "icd_codes", m.group(1) if m else None)
+
+        m = re.search(r"(?:Procedure|Surgery|Operation|Treatment)\s*[:\-]\s*(.+?)(?:\n|\r|$)", text, re.IGNORECASE)
+        add("clinical", "procedure", m.group(1)[:300] if m else None)
+
+        m = re.search(r"(?:Symptoms?|Chief\s*Complaint|Presenting\s*Complaint|C/O)\s*[:\-]\s*(.+?)(?:\n|\r|$)", text, re.IGNORECASE)
+        add("clinical", "symptoms", m.group(1)[:300] if m else None)
+
+        m = re.search(r"(?:Medications?|Medicine|Drugs?|Rx)\s*[:\-]\s*(.+?)(?:\n|\r|$)", text, re.IGNORECASE)
+        add("clinical", "medications", m.group(1)[:300] if m else None)
+
+        m = re.search(r"(?:BP|Blood\s*Pressure)\s*[:\-]\s*(\d{2,3}\s*/\s*\d{2,3})", text, re.IGNORECASE)
+        add("clinical", "blood_pressure", m.group(1) if m else None)
+
+        m = re.search(r"(?:Pulse|Heart\s*Rate|HR)\s*[:\-]\s*(\d{2,3})\s*(?:bpm|/min)?", text, re.IGNORECASE)
+        add("clinical", "pulse", m.group(1) if m else None)
+
+        m = re.search(r"(?:Temp|Temperature)\s*[:\-]\s*([\d.]+)\s*(?:°?[FC])?", text, re.IGNORECASE)
+        add("clinical", "temperature", m.group(1) if m else None)
+
+        m = re.search(r"(?:SpO2|Oxygen\s*Saturation|O2\s*Sat)\s*[:\-]\s*(\d{2,3})\s*%?", text, re.IGNORECASE)
+        add("clinical", "spo2", m.group(1) if m else None)
+
+        m = re.search(r"(?:Allergy|Allergies|Known\s*Allergies)\s*[:\-]\s*(.+?)(?:\n|\r|$)", text, re.IGNORECASE)
+        add("clinical", "allergies", m.group(1)[:200] if m else None)
+
+        # ── Financial Data ──
+        m = re.search(r"(?:Admission\s*Date|Date\s*of\s*Admission|DOA|Admitted\s*On)\s*[:\-]\s*([\d/.\-]+)", text, re.IGNORECASE)
+        add("financial", "admission_date", m.group(1) if m else None)
+
+        m = re.search(r"(?:Discharge\s*Date|Date\s*of\s*Discharge|DOD|Discharged\s*On)\s*[:\-]\s*([\d/.\-]+)", text, re.IGNORECASE)
+        add("financial", "discharge_date", m.group(1) if m else None)
+
+        m = re.search(r"(?:Total\s*(?:Bill|Amount|Charges?)|Grand\s*Total|Net\s*Amount|Bill\s*Amount)\s*[:\-]?\s*(?:Rs\.?|INR|₹)?\s*([\d,]+(?:\.\d{2})?)", text, re.IGNORECASE)
+        add("financial", "total_bill_amount", m.group(1) if m else None)
+
+        m = re.search(r"(?:Room\s*(?:Rent|Charges?)|Bed\s*Charges?)\s*[:\-]?\s*(?:Rs\.?|INR|₹)?\s*([\d,]+(?:\.\d{2})?)", text, re.IGNORECASE)
+        add("financial", "room_charges", m.group(1) if m else None)
+
+        m = re.search(r"(?:Medicine\s*Charges?|Pharmacy|Drug\s*Charges?)\s*[:\-]?\s*(?:Rs\.?|INR|₹)?\s*([\d,]+(?:\.\d{2})?)", text, re.IGNORECASE)
+        add("financial", "medicine_charges", m.group(1) if m else None)
+
+        m = re.search(r"(?:Investigation|Lab\s*Charges?|Diagnostic|Test\s*Charges?)\s*[:\-]?\s*(?:Rs\.?|INR|₹)?\s*([\d,]+(?:\.\d{2})?)", text, re.IGNORECASE)
+        add("financial", "investigation_charges", m.group(1) if m else None)
+
+        m = re.search(r"(?:Consultation|Doctor'?s?\s*(?:Fee|Charges?)|Professional\s*Fees?)\s*[:\-]?\s*(?:Rs\.?|INR|₹)?\s*([\d,]+(?:\.\d{2})?)", text, re.IGNORECASE)
+        add("financial", "consultation_charges", m.group(1) if m else None)
+
+        m = re.search(r"(?:OT\s*Charges?|Operation\s*Theatre|Surgical?\s*Charges?)\s*[:\-]?\s*(?:Rs\.?|INR|₹)?\s*([\d,]+(?:\.\d{2})?)", text, re.IGNORECASE)
+        add("financial", "ot_charges", m.group(1) if m else None)
+
+        m = re.search(r"(?:Discount|Concession)\s*[:\-]?\s*(?:Rs\.?|INR|₹)?\s*([\d,]+(?:\.\d{2})?)", text, re.IGNORECASE)
+        add("financial", "discount", m.group(1) if m else None)
+
+        m = re.search(r"(?:Paid|Amount\s*Paid|Advance|Deposit)\s*[:\-]?\s*(?:Rs\.?|INR|₹)?\s*([\d,]+(?:\.\d{2})?)", text, re.IGNORECASE)
+        add("financial", "amount_paid", m.group(1) if m else None)
+
+        m = re.search(r"(?:Balance|Due|Payable|Outstanding)\s*[:\-]?\s*(?:Rs\.?|INR|₹)?\s*([\d,]+(?:\.\d{2})?)", text, re.IGNORECASE)
+        add("financial", "balance_due", m.group(1) if m else None)
+
+        # Generic date fallback if no admission date was found
+        if "financial" not in fields or "admission_date" not in fields.get("financial", {}):
+            m = re.search(r"(?:Date)\s*[:\-]\s*([\d/.\-]+)", text, re.IGNORECASE)
+            add("financial", "admission_date", m.group(1) if m else None)
+
+        # ── Policy / Insurance ──
+        m = re.search(r"(?:Policy\s*(?:No\.?|Number)|Policy#)\s*[:\-]\s*([\w\d/-]+)", text, re.IGNORECASE)
+        add("policy", "policy_number", m.group(1) if m else None)
+
+        m = re.search(r"(?:Insurer|Insurance\s*Company?|Insurance\s*Provider)\s*[:\-]\s*([A-Za-z\s&.]+?)(?:\s*$|\s*,|\n)", text, re.IGNORECASE)
+        add("policy", "insurer_name", m.group(1) if m else None)
+
+        m = re.search(r"(?:TPA|Third\s*Party)\s*[:\-]\s*([A-Za-z\s&.]+?)(?:\s*$|\s*,|\n)", text, re.IGNORECASE)
+        add("policy", "tpa_name", m.group(1) if m else None)
+
+        m = re.search(r"(?:Claim\s*(?:No\.?|Number|ID)|Claim#)\s*[:\-]\s*([\w\d/-]+)", text, re.IGNORECASE)
+        add("policy", "claim_number", m.group(1) if m else None)
+
+        m = re.search(r"(?:Member\s*ID|Membership\s*No|Card\s*No)\s*[:\-]\s*([\w\d/-]+)", text, re.IGNORECASE)
+        add("policy", "member_id", m.group(1) if m else None)
+
         if not fields:
-            fields["general"] = {"raw_preview": text[:200].strip()}
-            
-        logger.info(f"Used Regex Fallback Extraction. Extracted {len(fields)} categories.")
+            fields["general"] = {"raw_preview": text[:500].strip()}
+
+        total_fields = sum(len(v) for v in fields.values())
+        logger.info(f"Regex fallback extracted {total_fields} fields across {len(fields)} categories.")
         return {"fields": fields, "confidences": {}, "raw": fields}
 
     payload = {

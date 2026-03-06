@@ -24,8 +24,8 @@ async def lifespan(app: FastAPI):
     with SessionLocal() as db:
         if not db.query(User).first():
             db.add_all([
-                User(username="hospital", hashed_password=get_password_hash("password123"), role=UserRole.HOSPITAL),
-                User(username="insurer", hashed_password=get_password_hash("password123"), role=UserRole.INSURER)
+                User(username="demo_hospital", hashed_password=get_password_hash("password123"), role=UserRole.HOSPITAL),
+                User(username="demo_insurer", hashed_password=get_password_hash("password123"), role=UserRole.INSURER)
             ])
             db.commit()
             logger.info("Admin/Test Users seeded successfully")

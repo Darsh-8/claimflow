@@ -154,8 +154,8 @@ The app auto-seeds two users on first run:
 
 | Username | Password | Role |
 |---|---|---|
-| `hospital` | `password123` | Hospital (upload & correct claims) |
-| `insurer` | `password123` | Insurer (review & approve/reject) |
+| `demo_hospital` | `password123` | Hospital (upload & correct claims) |
+| `demo_insurer` | `password123` | Insurer (review & approve/reject) |
 
 ---
 
