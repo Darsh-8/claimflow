@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
     ArrowLeft, RefreshCw, ShieldCheck, Save, FileUp,
-    FileText, Layers, ClipboardCheck, Clock, AlertTriangle
+    FileText, Layers, ClipboardCheck, Clock, AlertTriangle, BookOpen
 } from 'lucide-react';
 import StatusBadge from '../components/StatusBadge';
 import FieldEditor from '../components/FieldEditor';
@@ -406,6 +406,51 @@ export default function ClaimDetailPage() {
                             </div>
                         </div>
                     ) : null}
+                </div>
+            )}
+
+            {/* Document Summary */}
+            {data.summary && (
+                <div className="card animate-scale-in" style={{
+                    marginBottom: '24px',
+                    padding: '24px',
+                    background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 50%, #f0fdfa 100%)',
+                    border: '1px solid #bbf7d0',
+                    borderLeft: '4px solid #22c55e',
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+                        <div style={{
+                            width: '36px', height: '36px', borderRadius: '10px',
+                            background: '#dcfce7', display: 'flex',
+                            alignItems: 'center', justifyContent: 'center',
+                        }}>
+                            <BookOpen size={18} style={{ color: '#16a34a' }} />
+                        </div>
+                        <div>
+                            <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#15803d', margin: 0 }}>
+                                Document Summary
+                            </h3>
+                            <span style={{ fontSize: '0.72rem', color: '#4ade80' }}>
+                                {data.summary.document_count} document{data.summary.document_count !== 1 ? 's' : ''} analyzed · {formatDate(data.summary.created_at)}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div style={{
+                        padding: '16px 18px',
+                        background: 'rgba(255,255,255,0.7)', borderRadius: '8px',
+                        border: '1px solid rgba(34,197,94,0.15)',
+                    }}>
+                        {data.summary.summary_text.split('\n\n').map((paragraph, idx) => (
+                            <p key={idx} style={{
+                                fontSize: '0.9rem', lineHeight: '1.7', color: '#1a1a2e',
+                                margin: idx === 0 ? '0 0 12px 0' : '12px 0',
+                                ...(idx === data.summary!.summary_text.split('\n\n').length - 1 ? { marginBottom: 0 } : {}),
+                            }}>
+                                {paragraph}
+                            </p>
+                        ))}
+                    </div>
                 </div>
             )}
 

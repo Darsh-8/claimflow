@@ -2,7 +2,7 @@ from typing import List, Optional, Tuple, Dict, Any
 from sqlalchemy.orm import Session
 from models import (
     Claim, Document, ExtractedField, ValidationResult, AuditLog, FraudAlert,
-    ClaimStatus, DocumentType, OCRStatus, ValidationStatus
+    DocumentSummary, ClaimStatus, DocumentType, OCRStatus, ValidationStatus
 )
 
 
@@ -120,3 +120,25 @@ class ClaimRepository:
     def update_claim_status(db: Session, claim: Claim, new_status: ClaimStatus) -> None:
         """Update the status enum of a claim."""
         claim.status = new_status
+
+    @staticmethod
+    def get_latest_summary(db: Session, claim_id: int) -> Optional[DocumentSummary]:
+        """Fetch the most recent document summary for a claim."""
+        return db.query(DocumentSummary).filter(
+            DocumentSummary.claim_id == claim_id
+        ).order_by(DocumentSummary.created_at.desc()).first()
+
+    @staticmethod
+    def save_summary(
+        db: Session, claim_id: int, summary_text: str,
+        key_findings: list, document_count: int
+    ) -> DocumentSummary:
+        """Save a new AI-generated document summary."""
+        ds = DocumentSummary(
+            claim_id=claim_id,
+            summary_text=summary_text,
+            key_findings=key_findings,
+            document_count=document_count,
+        )
+        db.add(ds)
+        return ds

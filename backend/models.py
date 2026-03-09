@@ -82,6 +82,7 @@ class Claim(Base):
     validation_results = relationship("ValidationResult", back_populates="claim", cascade="all, delete-orphan")
     audit_logs = relationship("AuditLog", back_populates="claim", cascade="all, delete-orphan")
     fraud_alerts = relationship("FraudAlert", back_populates="claim", cascade="all, delete-orphan")
+    document_summaries = relationship("DocumentSummary", back_populates="claim", cascade="all, delete-orphan")
 
 
 class Document(Base):
@@ -192,3 +193,17 @@ class DoctorProfile(Base):
     total_claims = Column(Integer, default=0)
     high_value_claims = Column(Integer, default=0)
     created_at = Column(DateTime, default=utcnow, nullable=False)
+
+
+class DocumentSummary(Base):
+    """AI-generated summary of all documents associated with a claim."""
+    __tablename__ = "document_summaries"
+
+    id = Column(Integer, primary_key=True, index=True)
+    claim_id = Column(Integer, ForeignKey("claims.id"), nullable=False)
+    summary_text = Column(Text, nullable=False)
+    key_findings = Column(JSON, nullable=True)
+    document_count = Column(Integer, nullable=False)
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+
+    claim = relationship("Claim", back_populates="document_summaries")

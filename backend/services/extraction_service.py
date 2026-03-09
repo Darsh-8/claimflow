@@ -25,16 +25,20 @@ class AIServiceClient:
     def client(self) -> httpx.AsyncClient:
         return self._client
 
-EXTRACTION_PROMPT = """You are a medical data extraction engine.
+EXTRACTION_PROMPT = """You are a medical data extraction engine that handles documents in ANY language (English, Hindi, Bengali, Tamil, etc.).
 Analyze the provided text from a medical document and extract ALL available information into a structured JSON object.
+If the text is in a non-English language, translate the field values to English.
 
 Do NOT restrict yourself to a specific schema. Capture everything you find, including but not limited to:
-- Patient details (Name, Age, Gender, IDs)
-- Policy information (Insurer, Policy Number, TPA)
-- Hospital details (Name, Address, ROHINI ID)
-- Clinical data (Diagnosis, Procedures, Symptoms, Medications)
-- Dates (Admission, Discharge, Procedure)
-- Financials (Total Bill, Room Rent, Breakdown)
+- Patient details (Name, Age, Gender, Weight, Height, Blood Group, Phone, Address, IDs)
+- Policy information (Insurer, Policy Number, TPA, Member ID)
+- Hospital details (Name, Address, ROHINI ID, Treating Doctor, Department)
+- Clinical data (Diagnosis, Procedures, Symptoms, Medications with dosage, Vitals like BP/Pulse/SpO2, Allergies)
+- Dates (Admission, Discharge, Procedure, Follow-up)
+- Financials (Total Bill, Room Rent, Medicine Charges, Lab Charges, Consultation Fees, etc.)
+- Medications list (drug name, dosage, frequency, duration)
+
+IMPORTANT: Extract ALL medications individually. If medications are listed (Tab., Cap., Inj., Syp.), extract each one with its dosage and frequency.
 
 Return ONLY valid JSON. No markdown formatting, no commentary."""
 
@@ -209,6 +213,54 @@ async def extract_fields(raw_text: str) -> dict:
 
         if not fields:
             fields["general"] = {"raw_preview": text[:500].strip()}
+
+        # ── Medications (Tab./Cap./Inj./Syp. patterns) ──
+        med_pattern = re.findall(
+            r"(?:Tab\.?|Cap\.?|Inj\.?|Syp\.?|Cream|Ointment)\s*\.?\s*([A-Za-z][A-Za-z0-9\s./-]+?)(?:\s+\d+[+x]|\s*$|\n)",
+            text, re.IGNORECASE | re.MULTILINE
+        )
+        if med_pattern:
+            # Extract full medication lines for more context
+            med_lines = re.findall(
+                r"((?:Tab|Cap|Inj|Syp|Cream|Ointment)\.?\s*\.?\s*[A-Za-z][A-Za-z0-9\s./-]+(?:[\d+x/]+.*?)?(?:\n|$))",
+                text, re.IGNORECASE | re.MULTILINE
+            )
+            for i, med_line in enumerate(med_lines[:15]):
+                clean_med = med_line.strip()[:200]
+                add("clinical", f"medication_{i+1}", clean_med)
+
+        # ── Weight with units (multilingual) ──
+        if "patient" not in fields or "weight" not in fields.get("patient", {}):
+            m = re.search(r"(\d+\.?\d*)\s*(?:kg|Kg|KG|kgs)", text)
+            add("patient", "weight", f"{m.group(1)} Kg" if m else None)
+
+        # ── Date patterns (DD/MM/YY, DD/MM/YYYY, DD-MM-YYYY) ──
+        if "financial" not in fields or "admission_date" not in fields.get("financial", {}):
+            date_matches = re.findall(r"(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})", text)
+            if date_matches:
+                add("financial", "admission_date", date_matches[0])
+                if len(date_matches) > 1:
+                    add("financial", "discharge_date", date_matches[-1])
+
+        # ── Address (capture multi-line address near top) ──
+        if "hospital" not in fields or "address" not in fields.get("hospital", {}):
+            addr_m = re.search(r"(\d+[,.]\s*[A-Za-z][A-Za-z\s,./]+(?:Road|Lane|Street|Nagar|Colony|Block|Sector|District|City|Town|Dhaka|Delhi|Mumbai|Kolkata|Chennai)[A-Za-z\s,./0-9-]*)", text, re.IGNORECASE)
+            add("hospital", "address", addr_m.group(1)[:200].strip() if addr_m else None)
+
+        # ── Doctor names from "Dr." prefix ──
+        if "hospital" not in fields or "treating_doctor" not in fields.get("hospital", {}):
+            dr_m = re.search(r"((?:Dr|Prof)\.?\s+[A-Za-z.\s]+?)(?:\s*$|\s*,|\n|(?=\s*(?:MBBS|MD|MS|FRCS|FCPS|BDS|DO|DNB)))", text, re.MULTILINE)
+            add("hospital", "treating_doctor", dr_m.group(1).strip() if dr_m else None)
+
+        # ── Designation / Specialty ──
+        spec_m = re.search(r"((?:MBBS|MD|MS|FRCS|FCPS|BDS|DO|DNB|MCh|DM|Fellowship)[A-Za-z\s,.()/]*)", text, re.IGNORECASE)
+        if spec_m:
+            add("hospital", "doctor_qualifications", spec_m.group(1).strip()[:200])
+
+        # ── Professional memberships ──
+        member_m = re.search(r"(Member\s+of\s+[A-Za-z\s().]+)", text, re.IGNORECASE)
+        if member_m:
+            add("hospital", "professional_membership", member_m.group(1).strip())
 
         total_fields = sum(len(v) for v in fields.values())
         logger.info(f"Regex fallback extracted {total_fields} fields across {len(fields)} categories.")

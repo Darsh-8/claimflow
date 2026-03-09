@@ -119,6 +119,19 @@ class FraudAlertResponse(BaseModel):
         from_attributes = True
 
 
+# --- Document Summary ---
+
+class DocumentSummaryResponse(BaseModel):
+    """Response schema for AI-generated document summaries."""
+    id: int
+    summary_text: str
+    key_findings: Optional[list[str]] = None
+    document_count: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
 # --- Claim Data (full detail) ---
 
 class ClaimDataResponse(BaseModel):
@@ -127,6 +140,7 @@ class ClaimDataResponse(BaseModel):
     extracted_fields: list[ExtractedFieldResponse] = []
     fraud_alerts: list[FraudAlertResponse] = []
     validation: Optional[ValidationResponse] = None
+    summary: Optional[DocumentSummaryResponse] = None
 
     class Config:
         from_attributes = True

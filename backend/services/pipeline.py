@@ -3,20 +3,21 @@ import logging
 from sqlalchemy.orm import Session
 
 from models import (
-    Claim, Document, ExtractedField, ValidationResult,
+    Claim, Document, ExtractedField, ValidationResult, DocumentSummary,
     ClaimStatus, OCRStatus, ValidationStatus
 )
 from services.ocr_service import run_ocr
 from services.extraction_service import extract_fields, flatten_fields
 from services.validation_service import validate_claim
 from services.fraud_service import evaluate_claim_fraud_risk
+from services.summary_service import generate_document_summary
 
 logger = logging.getLogger(__name__)
 
 
 async def process_claim(claim_id: int, db_session_factory):
     """
-    Full async pipeline: OCR → Extraction → Validation → Status Update.
+    Full async pipeline: OCR → Extraction → Validation → Fraud Scoring → Summary.
     Runs as a background task.
     """
     db: Session = db_session_factory()
@@ -51,6 +52,7 @@ async def process_claim(claim_id: int, db_session_factory):
 
         # --- Step 2: Extract structured fields ---
         combined_text = "\n\n---\n\n".join(all_raw_text)
+        extraction_result = {}
 
         try:
             extraction_result = await extract_fields(combined_text)
@@ -117,6 +119,32 @@ async def process_claim(claim_id: int, db_session_factory):
         except Exception as e:
             logger.exception(f"Fraud scoring failed for claim {claim_id}: {e}")
             # Non-blocking error for overall claim process
+
+        # --- Step 5: Generate Document Summary ---
+        try:
+            logger.info(f"Generating document summary for claim {claim_id}...")
+            summary_result = await generate_document_summary(
+                raw_texts=all_raw_text,
+                extracted_fields=extraction_result,
+            )
+
+            # Clear previous summaries
+            db.query(DocumentSummary).filter(
+                DocumentSummary.claim_id == claim_id
+            ).delete()
+
+            ds = DocumentSummary(
+                claim_id=claim_id,
+                summary_text=summary_result["summary_text"],
+                key_findings=summary_result.get("key_findings", []),
+                document_count=len(all_raw_text),
+            )
+            db.add(ds)
+            db.commit()
+            logger.info(f"Document summary saved for claim {claim_id}.")
+        except Exception as e:
+            logger.exception(f"Summary generation failed for claim {claim_id}: {e}")
+            # Non-blocking — summary failure does not affect claim status
 
         logger.info(f"Pipeline completed for claim {claim_id}.")
 

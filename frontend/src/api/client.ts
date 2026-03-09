@@ -116,6 +116,15 @@ export interface ClaimDataResponse {
     extracted_fields: ExtractedFieldResponse[];
     fraud_alerts: FraudAlertResponse[];
     validation: ValidationResponse | null;
+    summary: DocumentSummaryResponse | null;
+}
+
+export interface DocumentSummaryResponse {
+    id: number;
+    summary_text: string;
+    key_findings: string[] | null;
+    document_count: number;
+    created_at: string;
 }
 
 export interface UploadResponse {
@@ -173,6 +182,11 @@ export const claimsApi = {
 
     submitReview: async (id: number, decision: string, comments: string): Promise<ClaimStatusResponse> => {
         const { data } = await api.post(`/claims/${id}/review`, { decision, comments });
+        return data;
+    },
+
+    getSummary: async (id: number): Promise<DocumentSummaryResponse> => {
+        const { data } = await api.get(`/claims/${id}/summary`);
         return data;
     },
 };

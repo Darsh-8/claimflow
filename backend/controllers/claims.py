@@ -10,14 +10,14 @@ from sqlalchemy.orm import Session
 from database import get_db, SessionLocal
 from models import (
     Claim, Document, ExtractedField, ValidationResult, AuditLog, FraudAlert,
-    ClaimStatus, DocumentType, OCRStatus, ValidationStatus,
+    DocumentSummary, ClaimStatus, DocumentType, OCRStatus, ValidationStatus,
     User, UserRole
 )
 from views.schemas import (
     ClaimStatusResponse, ClaimListItem, ClaimDataResponse,
     DocumentResponse, ExtractedFieldResponse, ValidationResponse,
     UploadResponse, CorrectionRequest, FieldCorrection, FraudAlertResponse,
-    ClaimReviewRequest
+    ClaimReviewRequest, DocumentSummaryResponse
 )
 from services.pipeline import process_claim
 from services.validation_service import validate_claim
@@ -216,12 +216,49 @@ def get_claim_data(claim_id: int, db: Session = Depends(get_db), current_user: U
             created_at=validation.created_at,
         )
 
+    # Fetch document summary
+    summary = ClaimRepository.get_latest_summary(db, claim_id)
+    summary_resp = None
+    if summary:
+        summary_resp = DocumentSummaryResponse(
+            id=summary.id,
+            summary_text=summary.summary_text,
+            key_findings=summary.key_findings,
+            document_count=summary.document_count,
+            created_at=summary.created_at,
+        )
+
     return ClaimDataResponse(
         claim=claim_resp,
         documents=doc_responses,
         extracted_fields=field_responses,
         fraud_alerts=alert_responses,
         validation=val_resp,
+        summary=summary_resp,
+    )
+
+
+@router.get("/{claim_id}/summary", response_model=DocumentSummaryResponse)
+def get_claim_summary(
+    claim_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Get the AI-generated document summary for a claim."""
+    claim = ClaimRepository.get_claim_by_id(db, claim_id)
+    if not claim:
+        raise HTTPException(404, "Claim not found")
+
+    summary = ClaimRepository.get_latest_summary(db, claim_id)
+    if not summary:
+        raise HTTPException(404, "No summary available for this claim yet")
+
+    return DocumentSummaryResponse(
+        id=summary.id,
+        summary_text=summary.summary_text,
+        key_findings=summary.key_findings,
+        document_count=summary.document_count,
+        created_at=summary.created_at,
     )
 
 
