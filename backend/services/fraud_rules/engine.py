@@ -37,6 +37,34 @@ from .pattern_rules import (
     rule_code_upcoding_velocity,
     rule_weekend_admission_ratio_pivot
 )
+from .hospital_history_rules import (
+    rule_hospital_claim_volume_spike,
+    rule_hospital_rejection_rate,
+    rule_hospital_avg_bill_inflation,
+    rule_newly_registered_hospital,
+    rule_hospital_diagnosis_concentration,
+)
+from .patient_history_rules import (
+    rule_patient_cumulative_amount_spike,
+    rule_patient_claim_frequency,
+    rule_patient_hospital_hopping,
+    rule_repeat_diagnosis_abuse,
+    rule_age_procedure_mismatch,
+)
+from .irdai_rules import (
+    rule_missing_mandatory_documents,
+    rule_pre_authorization_violation,
+    rule_waiting_period_violation,
+    rule_daycare_procedure_overbilling,
+    rule_cashless_reimbursement_gap,
+)
+from .ayush_rules import (
+    rule_ayush_hospital_not_registered,
+    rule_ayush_allopathic_crossover,
+    rule_ayush_excessive_duration,
+    rule_ayush_bill_amount_outlier,
+    rule_unregistered_ayush_practitioner,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +98,31 @@ ALL_RULES = [
     rule_phantom_clinic_detection,
     # Pattern
     rule_code_upcoding_velocity,
-    rule_weekend_admission_ratio_pivot
+    rule_weekend_admission_ratio_pivot,
+    # Hospital History
+    rule_hospital_claim_volume_spike,
+    rule_hospital_rejection_rate,
+    rule_hospital_avg_bill_inflation,
+    rule_newly_registered_hospital,
+    rule_hospital_diagnosis_concentration,
+    # Patient History
+    rule_patient_cumulative_amount_spike,
+    rule_patient_claim_frequency,
+    rule_patient_hospital_hopping,
+    rule_repeat_diagnosis_abuse,
+    rule_age_procedure_mismatch,
+    # IRDAI Compliance
+    rule_missing_mandatory_documents,
+    rule_pre_authorization_violation,
+    rule_waiting_period_violation,
+    rule_daycare_procedure_overbilling,
+    rule_cashless_reimbursement_gap,
+    # AYUSH Fraud Detection
+    rule_ayush_hospital_not_registered,
+    rule_ayush_allopathic_crossover,
+    rule_ayush_excessive_duration,
+    rule_ayush_bill_amount_outlier,
+    rule_unregistered_ayush_practitioner,
 ]
 
 def evaluate_claim(db: Session, claim: Claim) -> tuple[int, list]:

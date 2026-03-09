@@ -182,6 +182,7 @@ class HospitalProfile(Base):
     total_claims = Column(Integer, default=0)
     average_claim_amount = Column(Float, default=0.0)
     is_flagged = Column(Integer, default=0)
+    is_ayush_registered = Column(Integer, default=0)
     created_at = Column(DateTime, default=utcnow, nullable=False)
 
 class DoctorProfile(Base):
