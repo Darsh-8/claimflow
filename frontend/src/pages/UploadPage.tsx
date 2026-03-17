@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Upload, FileText, X, Loader2 } from 'lucide-react';
 import FileDropzone from '../components/FileDropzone';
-import { claimsApi } from '../api/client';
+import { claimsApi } from '../client/apiClient';
 
 const DOC_TYPE_OPTIONS = [
     { value: 'discharge_summary', label: 'Discharge Summary' },

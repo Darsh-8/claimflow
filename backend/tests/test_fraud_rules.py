@@ -6,6 +6,20 @@ Unit tests for the 20 new fraud detection rules:
 - AYUSH Fraud Detection (AYUSH_001–005)
 """
 
+from service.fraud_rules.patient_history_rules import (
+    rule_age_procedure_mismatch,
+)
+from service.fraud_rules.ayush_rules import (
+    rule_ayush_allopathic_crossover,
+    rule_ayush_bill_amount_outlier,
+    rule_unregistered_ayush_practitioner,
+)
+from service.fraud_rules.irdai_rules import (
+    rule_missing_mandatory_documents,
+    rule_pre_authorization_violation,
+    rule_daycare_procedure_overbilling,
+)
+from service.fraud_rules.policy_rules import RuleResult
 import os
 import sys
 import pytest
@@ -14,9 +28,9 @@ from datetime import datetime, timedelta
 
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
-from services.fraud_rules.policy_rules import RuleResult
 
 # ─── Helpers ───
+
 
 def make_claim(patient_name="Test Patient", status="VALIDATED", created_at=None):
     claim = MagicMock()
@@ -26,12 +40,14 @@ def make_claim(patient_name="Test Patient", status="VALIDATED", created_at=None)
     claim.created_at = created_at or datetime.utcnow()
     return claim
 
+
 def make_doc(doc_type="discharge_summary"):
     doc = MagicMock()
     dt = MagicMock()
     dt.value = doc_type
     doc.doc_type = dt
     return doc
+
 
 def make_context(fields=None, docs=None, claim=None, db=None):
     return {
@@ -45,11 +61,7 @@ def make_context(fields=None, docs=None, claim=None, db=None):
 # ═══════════════════════════════════════════
 # IRDAI Rules
 # ═══════════════════════════════════════════
-from services.fraud_rules.irdai_rules import (
-    rule_missing_mandatory_documents,
-    rule_pre_authorization_violation,
-    rule_daycare_procedure_overbilling,
-)
+
 
 class TestIRDAIRules:
     def test_missing_mandatory_documents_no_docs(self):
@@ -107,11 +119,7 @@ class TestIRDAIRules:
 # ═══════════════════════════════════════════
 # AYUSH Rules
 # ═══════════════════════════════════════════
-from services.fraud_rules.ayush_rules import (
-    rule_ayush_allopathic_crossover,
-    rule_ayush_bill_amount_outlier,
-    rule_unregistered_ayush_practitioner,
-)
+
 
 class TestAYUSHRules:
     def test_ayush_allopathic_crossover_triggered(self):
@@ -184,9 +192,7 @@ class TestAYUSHRules:
 # ═══════════════════════════════════════════
 # Patient History Rules
 # ═══════════════════════════════════════════
-from services.fraud_rules.patient_history_rules import (
-    rule_age_procedure_mismatch,
-)
+
 
 class TestPatientHistoryRules:
     def test_age_procedure_mismatch_pediatric_adult(self):

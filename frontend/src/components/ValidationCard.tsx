@@ -1,5 +1,5 @@
 import { AlertTriangle, XCircle, Info, CheckCircle, ShieldCheck, ShieldX, Code } from 'lucide-react';
-import type { ValidationResponse } from '../api/client';
+import type { ValidationResponse } from '../client/apiClient';
 
 interface ValidationCardProps {
     validation: ValidationResponse;

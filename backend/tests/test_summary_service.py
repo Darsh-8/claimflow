@@ -3,6 +3,7 @@ Unit tests for the document summary service.
 Tests the fallback summary builder and mocked LLM path.
 """
 
+from service.summary_service import generate_document_summary, _build_fallback_summary
 import json
 import os
 import sys
@@ -10,8 +11,6 @@ import pytest
 from unittest.mock import MagicMock, AsyncMock, patch
 
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
-
-from services.summary_service import generate_document_summary, _build_fallback_summary
 
 
 # --- Fallback builder tests ---

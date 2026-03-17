@@ -1,6 +1,8 @@
+import React, { useState } from 'react';
 import { NavLink, Outlet, useSearchParams, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Upload, Activity, Search, LogOut } from 'lucide-react';
+import { LayoutDashboard, Upload, Activity, Search, LogOut, Settings } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { authApi } from '../client/apiClient';
 
 export default function Layout() {
     const [searchParams, setSearchParams] = useSearchParams();
@@ -13,6 +15,37 @@ export default function Layout() {
         if (val) setSearchParams({ q: val });
         else setSearchParams({});
     };
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const [currentPassword, setCurrentPassword] = useState('');
+    const [newPassword, setNewPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+    const [message, setMessage] = useState('');
+
+    const handleUpdatePassword = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setStatus('loading');
+        setMessage('');
+
+        if (newPassword !== confirmPassword) {
+            setStatus('error');
+            setMessage('New passwords do not match');
+            return;
+        }
+
+        try {
+            const res = await authApi.updatePassword(currentPassword, newPassword);
+            setStatus('success');
+            setMessage(res.message);
+            setCurrentPassword('');
+            setNewPassword('');
+            setConfirmPassword('');
+        } catch (err: any) {
+            setStatus('error');
+            setMessage(err.response?.data?.detail || 'Failed to update password. Please check your current password.');
+        }
+    };
+    
     return (
         <div className="app-layout">
             {/* ─── Sidebar ─── */}
@@ -80,16 +113,70 @@ export default function Layout() {
                             )}
                         </div>
                     </div>
-                    <div className="topbar-actions" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                    <div className="topbar-actions" style={{ display: 'flex', alignItems: 'center', gap: '16px', position: 'relative' }}>
                         <div className="topbar-avatar" style={{ background: user?.role === 'HOSPITAL' ? 'var(--accent-blue)' : 'var(--purple)' }}>
                             {user?.username.substring(0, 2).toUpperCase()}
                         </div>
+                        <button
+                            onClick={() => setIsSettingsOpen(!isSettingsOpen)}
+                            style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.875rem' }}
+                        >
+                            <Settings size={16} /> Settings
+                        </button>
                         <button
                             onClick={() => { logout(); navigate('/login'); }}
                             style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.875rem' }}
                         >
                             <LogOut size={16} /> Logout
                         </button>
+                        
+                        {isSettingsOpen && (
+                            <div style={{ position: 'absolute', top: '48px', right: '0', background: 'var(--bg-page)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', width: '300px', boxShadow: '0 8px 30px rgba(0,0,0,0.12)', zIndex: 100 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+                                    <h3 style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>Update Password</h3>
+                                    <button onClick={() => setIsSettingsOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>✕</button>
+                                </div>
+                                {status === 'success' && (
+                                    <div style={{ color: 'var(--success)', fontSize: '0.75rem', marginBottom: '8px', background: 'var(--success-bg)', padding: '6px', borderRadius: '4px' }}>
+                                        {message}
+                                    </div>
+                                )}
+                                {status === 'error' && (
+                                    <div style={{ color: 'var(--error)', fontSize: '0.75rem', marginBottom: '8px', background: 'var(--error-bg)', padding: '6px', borderRadius: '4px' }}>
+                                        {message}
+                                    </div>
+                                )}
+                                <form onSubmit={handleUpdatePassword}>
+                                    <input 
+                                        type="password" 
+                                        placeholder="Current Password" 
+                                        value={currentPassword}
+                                        onChange={(e) => setCurrentPassword(e.target.value)}
+                                        style={{ width: '100%', marginBottom: '8px', padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '0.875rem' }}
+                                        required
+                                    />
+                                    <input 
+                                        type="password" 
+                                        placeholder="New Password" 
+                                        value={newPassword}
+                                        onChange={(e) => setNewPassword(e.target.value)}
+                                        style={{ width: '100%', marginBottom: '8px', padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '0.875rem' }}
+                                        required
+                                    />
+                                    <input 
+                                        type="password" 
+                                        placeholder="Confirm New Password" 
+                                        value={confirmPassword}
+                                        onChange={(e) => setConfirmPassword(e.target.value)}
+                                        style={{ width: '100%', marginBottom: '12px', padding: '8px', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '0.875rem' }}
+                                        required
+                                    />
+                                    <button type="submit" disabled={status === 'loading'} style={{ width: '100%', padding: '8px', background: 'var(--accent-blue)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.875rem' }}>
+                                        {status === 'loading' ? 'Saving...' : 'Update Password'}
+                                    </button>
+                                </form>
+                            </div>
+                        )}
                     </div>
                 </header>
                 {/* Page body */}

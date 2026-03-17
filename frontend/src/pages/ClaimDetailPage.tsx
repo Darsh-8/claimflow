@@ -8,7 +8,7 @@ import StatusBadge from '../components/StatusBadge';
 import FieldEditor from '../components/FieldEditor';
 import ValidationCard from '../components/ValidationCard';
 import FileDropzone from '../components/FileDropzone';
-import { claimsApi, type ClaimDataResponse } from '../api/client';
+import { claimsApi, type ClaimDataResponse } from '../client/apiClient';
 import { useAuth } from '../context/AuthContext';
 
 const DOC_TYPE_LABELS: Record<string, string> = {

@@ -5,7 +5,7 @@ import {
     FileCheck2, Loader2, CheckCircle2, XCircle
 } from 'lucide-react';
 import StatusBadge from '../components/StatusBadge';
-import { claimsApi, type ClaimListItem } from '../api/client';
+import { claimsApi, type ClaimListItem } from '../client/apiClient';
 
 export default function DashboardPage() {
     const navigate = useNavigate();

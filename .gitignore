@@ -46,6 +46,10 @@ verify_output.txt
 push_error.txt
 val_out.json
 pdf_content.txt
+test_out*.txt
+uvicorn_logs.txt
+lint_output*.txt
+test_security_endpoints.py
 
 # Media / Uploads
 uploads/

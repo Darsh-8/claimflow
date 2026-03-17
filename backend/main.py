@@ -4,9 +4,9 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from database import engine, Base, SessionLocal
-from controllers import claims as claims_router
-from controllers import auth as auth_router
+from db.database import engine, Base, SessionLocal
+from api.routes import claims as claims_router
+from api.routes import auth as auth_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -17,19 +17,21 @@ async def lifespan(app: FastAPI):
     # Create tables on startup
     Base.metadata.create_all(bind=engine)
     logger.info("Database tables created")
-    
+
     # Seed Test Users
-    from models import User, UserRole
-    from security import get_password_hash
+    from model.models import User, UserRole
+    from utils.security import get_password_hash
     with SessionLocal() as db:
         if not db.query(User).first():
             db.add_all([
-                User(username="demo_hospital", hashed_password=get_password_hash("password123"), role=UserRole.HOSPITAL),
-                User(username="demo_insurer", hashed_password=get_password_hash("password123"), role=UserRole.INSURER)
+                User(username="demo_hospital", hashed_password=get_password_hash(
+                    "password123"), role=UserRole.HOSPITAL),
+                User(username="demo_insurer", hashed_password=get_password_hash(
+                    "password123"), role=UserRole.INSURER)
             ])
             db.commit()
             logger.info("Admin/Test Users seeded successfully")
-            
+
     yield
     logger.info("Shutting down")
 
