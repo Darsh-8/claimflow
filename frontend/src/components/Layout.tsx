@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { NavLink, Outlet, useSearchParams, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Upload, Activity, Search, LogOut, Settings } from 'lucide-react';
+import { LayoutDashboard, BarChart3, Upload, Activity, Search, LogOut, Settings, TrendingUp } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { authApi } from '../client/apiClient';
 
@@ -62,6 +62,22 @@ export default function Layout() {
                     >
                         <LayoutDashboard size={17} />
                         <span>Overview</span>
+                    </NavLink>
+                    {user?.role === 'HOSPITAL' && (
+                        <NavLink
+                            to="/analytics"
+                            className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+                        >
+                            <BarChart3 size={17} />
+                            <span>Performance</span>
+                        </NavLink>
+                    )}
+                    <NavLink
+                        to="/role-analytics"
+                        className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+                    >
+                        <TrendingUp size={17} />
+                        <span>Analytics</span>
                     </NavLink>
                     <NavLink
                         to="/upload"

@@ -57,6 +57,8 @@ class ClaimListItem(BaseModel):
     document_count: int = 0
     fraud_risk_score: Optional[int] = None
     reviewer_decision: Optional[str] = None
+    reviewer_comments: Optional[str] = None
+    reviewed_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
@@ -165,9 +167,94 @@ class ClaimDataResponse(BaseModel):
         from_attributes = True
 
 
+# --- Patient History ---
+
+class PatientHistoryClaim(BaseModel):
+    claim_id: int
+    status: str
+    diagnosis: Optional[str] = None
+    total_amount: Optional[str] = None
+    hospital_name: Optional[str] = None
+    fraud_risk_score: Optional[int] = None
+    created_at: str
+    reviewer_decision: Optional[str] = None
+
+class PatientHistoryResponse(BaseModel):
+    patient_name: str
+    total_past_claims: int
+    claims: list[PatientHistoryClaim]
+
+
 # --- Upload Response ---
 
 class UploadResponse(BaseModel):
     claim_id: int
     message: str
     documents_uploaded: int
+
+
+# --- Analytics Response ---
+
+class MonthlyStat(BaseModel):
+    month: str
+    total: int
+    approved: int
+    rejected: int
+
+class FraudBucket(BaseModel):
+    label: str
+    count: int
+
+class DocTypeStat(BaseModel):
+    doc_type: str
+    count: int
+
+class RecentClaimStat(BaseModel):
+    id: int
+    patient_name: str | None = None
+    status: str
+    fraud_risk_score: int | None = None
+    created_at: str
+
+class RejectionReason(BaseModel):
+    reason: str
+    count: int
+
+class ClaimAnalyticsResponse(BaseModel):
+    total_claims: int
+    processing: int
+    approved: int
+    rejected: int
+    info_requested: int
+    success_rate: float
+    avg_processing_time_hours: float
+    avg_fraud_risk_score: float
+    monthly_stats: list[MonthlyStat]
+    fraud_risk_distribution: list[FraudBucket]
+    doc_type_breakdown: list[DocTypeStat]
+    recent_claims: list[RecentClaimStat]
+    top_rejection_reasons: list[RejectionReason]
+
+    class Config:
+        from_attributes = True
+
+# --- Role-Specific Analytics ---
+
+class ClinicalTrend(BaseModel):
+    label: str
+    count: int
+
+class HospitalTrend(BaseModel):
+    hospital_name: str
+    count: int
+
+class RoleAnalyticsResponse(BaseModel):
+    role: str
+    total_revenue_claimed: float
+    total_revenue_approved: float
+    total_fraud_savings: Optional[float] = None
+    top_diagnoses: list[ClinicalTrend]
+    top_hospitals: Optional[list[HospitalTrend]] = None
+
+    class Config:
+        from_attributes = True

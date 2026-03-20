@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Upload, FileText, X, Loader2 } from 'lucide-react';
+import { Upload, FileText, X, Loader2, Building } from 'lucide-react';
 import FileDropzone from '../components/FileDropzone';
-import { claimsApi } from '../client/apiClient';
+import { claimsApi, usersApi, type UserResponse } from '../client/apiClient';
 
 const DOC_TYPE_OPTIONS = [
     { value: 'discharge_summary', label: 'Discharge Summary' },
@@ -22,6 +22,20 @@ export default function UploadPage() {
     const [entries, setEntries] = useState<FileEntry[]>([]);
     const [uploading, setUploading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [insurers, setInsurers] = useState<UserResponse[]>([]);
+    const [selectedInsurerId, setSelectedInsurerId] = useState<number | ''>('');
+
+    useEffect(() => {
+        const fetchInsurers = async () => {
+            try {
+                const list = await usersApi.getInsurers();
+                setInsurers(list);
+            } catch (err) {
+                console.error("Failed to fetch insurers", err);
+            }
+        };
+        fetchInsurers();
+    }, []);
 
     const handleFilesSelected = (files: File[]) => {
         const newEntries = files.map((file) => ({
@@ -57,6 +71,10 @@ export default function UploadPage() {
             setError('Please add at least one document.');
             return;
         }
+        if (selectedInsurerId === '') {
+            setError('Please select an Insurer for this claim.');
+            return;
+        }
 
         setUploading(true);
         setError(null);
@@ -64,7 +82,7 @@ export default function UploadPage() {
         try {
             const files = entries.map((e) => e.file);
             const docTypes = entries.map((e) => e.docType);
-            const result = await claimsApi.upload(files, docTypes);
+            const result = await claimsApi.upload(files, docTypes, Number(selectedInsurerId));
             navigate(`/claims/${result.claim_id}`);
         } catch (err: any) {
             setError(err.response?.data?.detail || 'Upload failed. Please try again.');
@@ -86,6 +104,44 @@ export default function UploadPage() {
                 <p className="page-subtitle">
                     Upload hospital documents to create a new claim. Supported formats: PDF, JPG, PNG.
                 </p>
+            </div>
+
+            {/* Insurer Selection */}
+            <div className="card" style={{ padding: '24px', marginBottom: '20px' }}>
+                <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Building size={18} style={{ color: 'var(--accent-blue)' }} /> 
+                    Assign to Insurer
+                </h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <label style={{ fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-secondary)' }}>
+                        Select the Insurer handling this claim:
+                    </label>
+                    <select
+                        value={selectedInsurerId}
+                        onChange={(e) => {
+                            const val = e.target.value;
+                            setSelectedInsurerId(val === '' ? '' : Number(val));
+                            if (val !== '') setError(null);
+                        }}
+                        style={{
+                            padding: '10px 14px',
+                            border: '1px solid var(--border)',
+                            borderRadius: '6px',
+                            fontSize: '0.9rem',
+                            fontFamily: 'inherit',
+                            backgroundColor: 'white',
+                            color: 'var(--text-primary)',
+                            maxWidth: '400px'
+                        }}
+                    >
+                        <option value="">-- Choose an Insurer --</option>
+                        {insurers.map(insurer => (
+                            <option key={insurer.id} value={insurer.id}>
+                                {insurer.username}
+                            </option>
+                        ))}
+                    </select>
+                </div>
             </div>
 
             {/* Dropzone */}

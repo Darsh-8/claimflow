@@ -88,6 +88,8 @@ class Claim(Base):
     created_at = Column(DateTime, default=utcnow, nullable=False)
     updated_at = Column(DateTime, default=utcnow,
                         onupdate=utcnow, nullable=False)
+    insurer_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=True)
     fraud_risk_score = Column(Integer, nullable=True)
     fraud_flags = Column(JSON, nullable=True)
 

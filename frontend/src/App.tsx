@@ -1,6 +1,8 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Layout from './components/Layout';
 import DashboardPage from './pages/DashboardPage';
+import PerformanceDashboardPage from './pages/PerformanceDashboardPage';
+import RoleAnalyticsPage from './pages/RoleAnalyticsPage';
 import UploadPage from './pages/UploadPage';
 import ClaimDetailPage from './pages/ClaimDetailPage';
 import LoginPage from './pages/LoginPage';
@@ -26,6 +28,8 @@ export default function App() {
         <Route element={<PrivateRoute />}>
           <Route element={<Layout />}>
             <Route path="/" element={<DashboardPage />} />
+            <Route path="/analytics" element={<PerformanceDashboardPage />} />
+            <Route path="/role-analytics" element={<RoleAnalyticsPage />} />
             <Route path="/upload" element={<UploadPage />} />
             <Route path="/claims/:id" element={<ClaimDetailPage />} />
           </Route>

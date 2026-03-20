@@ -133,12 +133,28 @@ export interface UploadResponse {
     documents_uploaded: number;
 }
 
+export interface UserResponse {
+    id: number;
+    username: string;
+    role: string;
+}
+
+export const usersApi = {
+    getInsurers: async (): Promise<UserResponse[]> => {
+        const { data } = await api.get('/users/insurers');
+        return data;
+    }
+};
+
 // API methods
 export const claimsApi = {
-    upload: async (files: File[], docTypes: string[]): Promise<UploadResponse> => {
+    upload: async (files: File[], docTypes: string[], insurerId?: number): Promise<UploadResponse> => {
         const formData = new FormData();
         files.forEach((file) => formData.append('files', file));
         docTypes.forEach((dt) => formData.append('doc_types', dt));
+        if (insurerId) {
+            formData.append('insurer_id', insurerId.toString());
+        }
         const { data } = await api.post('/claims/upload', formData, {
             headers: { 'Content-Type': 'multipart/form-data' },
         });
@@ -180,6 +196,20 @@ export const claimsApi = {
         return data;
     },
 
+    downloadDocument: async (claimId: number, docId: number, filename: string): Promise<void> => {
+        const response = await api.get(`/claims/${claimId}/documents/${docId}/download`, {
+            responseType: 'blob'
+        });
+        const url = window.URL.createObjectURL(new Blob([response.data]));
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', filename);
+        document.body.appendChild(link);
+        link.click();
+        link.parentNode?.removeChild(link);
+        window.URL.revokeObjectURL(url);
+    },
+
     submitReview: async (id: number, decision: string, comments: string): Promise<ClaimStatusResponse> => {
         const { data } = await api.post(`/claims/${id}/review`, { decision, comments });
         return data;
@@ -187,6 +217,11 @@ export const claimsApi = {
 
     getSummary: async (id: number): Promise<DocumentSummaryResponse> => {
         const { data } = await api.get(`/claims/${id}/summary`);
+        return data;
+    },
+
+    getPatientHistory: async (claimId: number): Promise<PatientHistoryResponse> => {
+        const { data } = await api.get(`/claims/${claimId}/patient-history`);
         return data;
     },
 };
@@ -202,6 +237,99 @@ export const authApi = {
     },
     updatePassword: async (current_password: string, new_password: string): Promise<{ message: string }> => {
         const { data } = await api.post('/auth/update-password', { current_password, new_password });
+        return data;
+    }
+};
+
+export interface MonthlyStat {
+    month: string;
+    total: number;
+    approved: number;
+    rejected: number;
+}
+
+export interface PatientHistoryClaim {
+    claim_id: number;
+    status: string;
+    diagnosis: string | null;
+    total_amount: string | null;
+    hospital_name: string | null;
+    fraud_risk_score: number | null;
+    created_at: string;
+    reviewer_decision: string | null;
+}
+
+export interface PatientHistoryResponse {
+    patient_name: string;
+    total_past_claims: number;
+    claims: PatientHistoryClaim[];
+}
+
+export interface FraudBucket {
+    label: string;
+    count: number;
+}
+
+export interface DocTypeStat {
+    doc_type: string;
+    count: number;
+}
+
+export interface RecentClaimStat {
+    id: number;
+    patient_name: string | null;
+    status: string;
+    fraud_risk_score: number | null;
+    created_at: string;
+}
+
+export interface RejectionReason {
+    reason: string;
+    count: number;
+}
+
+export interface ClaimAnalyticsResponse {
+    total_claims: number;
+    processing: number;
+    approved: number;
+    rejected: number;
+    info_requested: number;
+    success_rate: number;
+    avg_processing_time_hours: number;
+    avg_fraud_risk_score: number;
+    monthly_stats: MonthlyStat[];
+    fraud_risk_distribution: FraudBucket[];
+    doc_type_breakdown: DocTypeStat[];
+    recent_claims: RecentClaimStat[];
+    top_rejection_reasons: RejectionReason[];
+}
+
+export interface ClinicalTrend {
+    label: string;
+    count: number;
+}
+
+export interface HospitalTrend {
+    hospital_name: string;
+    count: number;
+}
+
+export interface RoleAnalyticsResponse {
+    role: string;
+    total_revenue_claimed: number;
+    total_revenue_approved: number;
+    total_fraud_savings: number | null;
+    top_diagnoses: ClinicalTrend[];
+    top_hospitals: HospitalTrend[] | null;
+}
+
+export const analyticsApi = {
+    getAnalytics: async (): Promise<ClaimAnalyticsResponse> => {
+        const { data } = await api.get('/claims/dashboard/analytics');
+        return data;
+    },
+    getRoleAnalytics: async (): Promise<RoleAnalyticsResponse> => {
+        const { data } = await api.get('/claims/dashboard/role-analytics');
         return data;
     }
 };

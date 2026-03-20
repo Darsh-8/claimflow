@@ -219,7 +219,7 @@ export default function DashboardPage() {
                                 <th>Policy No.</th>
                                 <th>Documents</th>
                                 <th>Submitted</th>
-                                <th>Status</th>
+                                <th>Status & Comments</th>
                                 <th>Risk Score</th>
                             </tr>
                         </thead>
@@ -273,7 +273,27 @@ export default function DashboardPage() {
                                             {formatDate(claim.created_at)}
                                         </div>
                                     </td>
-                                    <td><StatusBadge status={claim.status} /></td>
+                                    <td>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                            <StatusBadge status={claim.status} />
+                                            {claim.reviewer_comments && claim.reviewer_comments.length > 0 && (
+                                                <div 
+                                                    style={{ 
+                                                        fontSize: '0.75rem', 
+                                                        color: 'var(--text-secondary)', 
+                                                        maxWidth: '180px', 
+                                                        whiteSpace: 'nowrap', 
+                                                        overflow: 'hidden', 
+                                                        textOverflow: 'ellipsis',
+                                                        lineHeight: '1.2'
+                                                    }}
+                                                    title={claim.reviewer_comments} // Added title so hover shows full comment
+                                                >
+                                                    {claim.reviewer_comments}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </td>
                                     <td>
                                         {claim.fraud_risk_score !== null ? (
                                             <div style={{

@@ -10,9 +10,9 @@ class ClaimRepository:
     """ORM Repository for coordinating Claim-related database interactions."""
 
     @staticmethod
-    def create_claim(db: Session) -> Claim:
+    def create_claim(db: Session, insurer_id: Optional[int] = None, created_by: Optional[int] = None) -> Claim:
         """Create a new empty claim with PENDING status."""
-        claim = Claim(status=ClaimStatus.PENDING)
+        claim = Claim(status=ClaimStatus.PENDING, insurer_id=insurer_id, created_by=created_by)
         db.add(claim)
         db.commit()
         db.refresh(claim)
@@ -46,6 +46,11 @@ class ClaimRepository:
     def get_claims_list(db: Session, skip: int = 0, limit: int = 50) -> List[Claim]:
         """Get a paginated list of all claims."""
         return db.query(Claim).order_by(Claim.created_at.desc()).offset(skip).limit(limit).all()
+
+    @staticmethod
+    def get_all_claims(db: Session) -> List[Claim]:
+        """Get all claims for analytics."""
+        return db.query(Claim).order_by(Claim.created_at.desc()).all()
 
     @staticmethod
     def get_claim_by_id(db: Session, claim_id: int) -> Optional[Claim]:

@@ -94,7 +94,10 @@ export default function LoginPage() {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', background: '#f8fafc', padding: '8px', borderRadius: '6px' }}>
                             <HeartPulse size={16} color="var(--accent-blue)" />
-                            <div><strong>Hospital Role:</strong> demo_hospital / password123</div>
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                <span><strong>Hospital 1:</strong> demo_hospital / password123</span>
+                                <span><strong>Hospital 2:</strong> demo_hospital_2 / password123</span>
+                            </div>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', background: '#f8fafc', padding: '8px', borderRadius: '6px' }}>
                             <Building2 size={16} color="var(--purple)" />
