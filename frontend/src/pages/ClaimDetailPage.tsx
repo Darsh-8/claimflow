@@ -1,14 +1,14 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-    ArrowLeft, RefreshCw, ShieldCheck, Save, FileUp,
-    FileText, Layers, ClipboardCheck, Clock, AlertTriangle, BookOpen
+    ArrowLeft, RefreshCw, ShieldCheck, Save, FileUp, Download,
+    FileText, Layers, ClipboardCheck, Clock, AlertTriangle, BookOpen, Users
 } from 'lucide-react';
 import StatusBadge from '../components/StatusBadge';
 import FieldEditor from '../components/FieldEditor';
 import ValidationCard from '../components/ValidationCard';
 import FileDropzone from '../components/FileDropzone';
-import { claimsApi, type ClaimDataResponse } from '../api/client';
+import { claimsApi, type ClaimDataResponse, type PatientHistoryResponse } from '../client/apiClient';
 import { useAuth } from '../context/AuthContext';
 
 const DOC_TYPE_LABELS: Record<string, string> = {
@@ -49,7 +49,11 @@ export default function ClaimDetailPage() {
     const [saving, setSaving] = useState(false);
     const [showUpload, setShowUpload] = useState(false);
     const [uploadDocType, setUploadDocType] = useState('discharge_summary');
-    const [activeTab, setActiveTab] = useState<'fields' | 'documents' | 'validation' | 'fraud'>('fields');
+    const [activeTab, setActiveTab] = useState<'fields' | 'documents' | 'validation' | 'fraud' | 'history'>('fields');
+
+    // Patient History
+    const [patientHistory, setPatientHistory] = useState<PatientHistoryResponse | null>(null);
+    const [historyLoading, setHistoryLoading] = useState(false);
 
     // Review State
     const [reviewDecision, setReviewDecision] = useState<'APPROVED' | 'REJECTED' | 'INFO_REQUESTED'>('APPROVED');
@@ -78,6 +82,17 @@ export default function ClaimDetailPage() {
         }, 3000);
         return () => clearInterval(interval);
     }, [fetchData, data?.claim.status]);
+
+    // Fetch patient history for the badge count and tab content
+    useEffect(() => {
+        if (!id || !data?.claim.patient_name) return;
+        if (patientHistory) return; // already loaded
+        setHistoryLoading(true);
+        claimsApi.getPatientHistory(parseInt(id))
+            .then(setPatientHistory)
+            .catch(() => setPatientHistory(null))
+            .finally(() => setHistoryLoading(false));
+    }, [id, data?.claim.patient_name, patientHistory]);
 
     const handleFieldSave = (fieldId: number, newValue: string) => {
         setCorrections((prev) => new Map(prev).set(fieldId, newValue));
@@ -215,6 +230,7 @@ export default function ClaimDetailPage() {
         { key: 'documents' as const, label: 'Documents', icon: FileText, count: data.documents.length },
         { key: 'validation' as const, label: 'Validation', icon: ClipboardCheck, count: data.validation ? 1 : 0 },
         { key: 'fraud' as const, label: 'Fraud Alerts', icon: ShieldCheck, count: data.fraud_alerts ? data.fraud_alerts.length : 0 },
+        { key: 'history' as const, label: 'Patient History', icon: Users, count: patientHistory?.total_past_claims ?? 0 },
     ];
 
     return (
@@ -257,6 +273,28 @@ export default function ClaimDetailPage() {
                     <Clock size={13} /> {formatDate(data.claim.created_at)}
                 </span>
             </div>
+
+            {/* Info Requested Banner */}
+            {user?.role === 'HOSPITAL' && data.claim.status === 'INFO_REQUESTED' && (
+                <div style={{ 
+                    marginBottom: '24px', 
+                    padding: '16px 20px', 
+                    borderLeft: '4px solid var(--warning)', 
+                    background: 'var(--warning-bg)', 
+                    display: 'flex', 
+                    alignItems: 'flex-start', 
+                    gap: '12px',
+                    borderRadius: '8px' 
+                }}>
+                    <AlertTriangle size={20} style={{ color: 'var(--warning)', marginTop: '2px' }} />
+                    <div>
+                        <h4 style={{ margin: '0 0 4px 0', color: '#854d0e', fontSize: '0.95rem', fontWeight: 600 }}>Information Requested</h4>
+                        <p style={{ margin: 0, fontSize: '0.875rem', color: '#a16207' }}>
+                            The insurer has requested additional information or missing documents. Please click <strong>Upload Missing Doc</strong> below to submit the required files and resume processing.
+                        </p>
+                    </div>
+                </div>
+            )}
 
             {/* Action buttons */}
             <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', flexWrap: 'wrap' }}>
@@ -545,6 +583,16 @@ export default function ClaimDetailPage() {
                                 </div>
                             </div>
                             <StatusBadge status={doc.ocr_status} />
+                            {user?.role === 'INSURER' && (
+                                <button
+                                    className="btn-icon"
+                                    onClick={() => claimsApi.downloadDocument(data.claim.id, doc.id, doc.original_filename)}
+                                    title="Download Document"
+                                    style={{ marginLeft: '12px', color: 'var(--accent-blue)', background: 'var(--info-bg)' }}
+                                >
+                                    <Download size={16} />
+                                </button>
+                            )}
                         </div>
                     ))}
                 </div>
@@ -605,6 +653,99 @@ export default function ClaimDetailPage() {
                             <ShieldCheck size={48} style={{ color: 'var(--success)', opacity: 0.8 }} />
                             <h3 style={{ marginTop: '12px', fontWeight: 600, color: 'var(--success)' }}>Low Risk</h3>
                             <p style={{ marginTop: '4px', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>No fraud alerts were triggered for this claim.</p>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {activeTab === 'history' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                    {historyLoading ? (
+                        <div className="empty-state">
+                            <div className="spinner" style={{ width: '32px', height: '32px' }} />
+                            <p style={{ marginTop: '10px', color: 'var(--text-secondary)' }}>Loading patient history...</p>
+                        </div>
+                    ) : patientHistory && patientHistory.claims.length > 0 ? (
+                        <>
+                            <div style={{
+                                padding: '14px 18px',
+                                background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(139, 92, 246, 0.05))',
+                                borderRadius: '10px',
+                                border: '1px solid rgba(99, 102, 241, 0.15)',
+                                marginBottom: '4px'
+                            }}>
+                                <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: 500 }}>
+                                    <Users size={15} style={{ verticalAlign: 'middle', marginRight: '8px', color: '#6366F1' }} />
+                                    <strong>{patientHistory.patient_name}</strong> has <strong style={{ color: '#6366F1' }}>{patientHistory.total_past_claims}</strong> previous claim{patientHistory.total_past_claims !== 1 ? 's' : ''} on record.
+                                </p>
+                            </div>
+                            {patientHistory.claims.map((claim) => (
+                                <div
+                                    key={claim.claim_id}
+                                    onClick={() => navigate(`/claims/${claim.claim_id}`)}
+                                    style={{
+                                        padding: '18px',
+                                        borderRadius: '10px',
+                                        background: 'var(--bg-card)',
+                                        border: '1px solid var(--border)',
+                                        cursor: 'pointer',
+                                        transition: 'box-shadow 0.2s ease, border-color 0.2s ease',
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.06)';
+                                        e.currentTarget.style.borderColor = 'rgba(99, 102, 241, 0.3)';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.currentTarget.style.boxShadow = 'none';
+                                        e.currentTarget.style.borderColor = 'var(--border)';
+                                    }}
+                                >
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.82rem', fontWeight: 600, color: 'var(--accent-blue)' }}>
+                                            Claim #{String(claim.claim_id).padStart(5, '0')}
+                                        </span>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <StatusBadge status={claim.status} />
+                                            {claim.fraud_risk_score !== null && (
+                                                <span style={{
+                                                    padding: '2px 8px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 600,
+                                                    background: claim.fraud_risk_score > 70 ? 'var(--error-bg)' : claim.fraud_risk_score > 30 ? 'var(--warning-bg)' : 'var(--success-bg)',
+                                                    color: claim.fraud_risk_score > 70 ? 'var(--error)' : claim.fraud_risk_score > 30 ? 'var(--warning)' : 'var(--success)',
+                                                }}>
+                                                    Risk: {claim.fraud_risk_score}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', fontSize: '0.84rem', color: 'var(--text-secondary)' }}>
+                                        {claim.diagnosis && (
+                                            <span>🩺 <strong style={{ color: 'var(--text-primary)' }}>{claim.diagnosis}</strong></span>
+                                        )}
+                                        {claim.total_amount && (
+                                            <span>💰 Amount: <strong style={{ color: 'var(--text-primary)' }}>{claim.total_amount}</strong></span>
+                                        )}
+                                        {claim.hospital_name && (
+                                            <span>🏥 {claim.hospital_name}</span>
+                                        )}
+                                        <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                            <Clock size={12} /> {formatDate(claim.created_at)}
+                                        </span>
+                                        {claim.reviewer_decision && (
+                                            <span>Decision: <strong>{claim.reviewer_decision}</strong></span>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </>
+                    ) : (
+                        <div className="card empty-state">
+                            <Users size={48} style={{ color: 'var(--text-muted)', opacity: 0.5 }} />
+                            <h3 style={{ marginTop: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>No Previous Claims</h3>
+                            <p style={{ marginTop: '4px', color: 'var(--text-muted)', fontSize: '0.875rem' }}>
+                                {data.claim.patient_name
+                                    ? `No other claims found for ${data.claim.patient_name}.`
+                                    : 'Patient name has not been extracted yet. Process the claim first.'}
+                            </p>
                         </div>
                     )}
                 </div>

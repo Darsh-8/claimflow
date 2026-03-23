@@ -70,7 +70,12 @@ export default function LoginPage() {
                         />
                     </div>
                     <div style={{ marginBottom: '24px' }}>
-                        <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, marginBottom: '6px' }}>Password</label>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                            <label style={{ fontSize: '0.875rem', fontWeight: 600 }}>Password</label>
+                            <a href="/forgot-password" style={{ fontSize: '0.75rem', color: 'var(--accent-blue)', textDecoration: 'none', fontWeight: 500 }}>
+                                Forgot Password?
+                            </a>
+                        </div>
                         <input
                             type="password"
                             value={password}
@@ -89,7 +94,10 @@ export default function LoginPage() {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', background: '#f8fafc', padding: '8px', borderRadius: '6px' }}>
                             <HeartPulse size={16} color="var(--accent-blue)" />
-                            <div><strong>Hospital Role:</strong> demo_hospital / password123</div>
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                <span><strong>Hospital 1:</strong> demo_hospital / password123</span>
+                                <span><strong>Hospital 2:</strong> demo_hospital_2 / password123</span>
+                            </div>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', background: '#f8fafc', padding: '8px', borderRadius: '6px' }}>
                             <Building2 size={16} color="var(--purple)" />

@@ -4,9 +4,11 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from database import engine, Base, SessionLocal
-from controllers import claims as claims_router
-from controllers import auth as auth_router
+from db.database import engine, Base, SessionLocal
+from api.routes import claims as claims_router
+from api.routes import auth as auth_router
+from api.routes import users as users_router
+from api.routes import notifications as notifications_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -17,19 +19,33 @@ async def lifespan(app: FastAPI):
     # Create tables on startup
     Base.metadata.create_all(bind=engine)
     logger.info("Database tables created")
-    
+
     # Seed Test Users
-    from models import User, UserRole
-    from security import get_password_hash
+    from model.models import User, UserRole
+    from utils.security import get_password_hash
     with SessionLocal() as db:
-        if not db.query(User).first():
-            db.add_all([
-                User(username="demo_hospital", hashed_password=get_password_hash("password123"), role=UserRole.HOSPITAL),
-                User(username="demo_insurer", hashed_password=get_password_hash("password123"), role=UserRole.INSURER)
-            ])
+        # Ensure all required demo accounts are seeded
+        demo_accounts = [
+            {"username": "demo_hospital", "password": "password123", "role": UserRole.HOSPITAL},
+            {"username": "demo_hospital_2", "password": "password123", "role": UserRole.HOSPITAL},
+            {"username": "demo_insurer", "password": "password123", "role": UserRole.INSURER},
+            {"username": "demo_insurer_2", "password": "password123", "role": UserRole.INSURER},
+        ]
+
+        added_any = False
+        for account in demo_accounts:
+            if not db.query(User).filter_by(username=account["username"]).first():
+                db.add(User(
+                    username=account["username"],
+                    hashed_password=get_password_hash(account["password"]),
+                    role=account["role"]
+                ))
+                added_any = True
+        
+        if added_any:
             db.commit()
             logger.info("Admin/Test Users seeded successfully")
-            
+
     yield
     logger.info("Shutting down")
 
@@ -60,6 +76,8 @@ app.add_middleware(
 # Include routers
 app.include_router(auth_router.router)
 app.include_router(claims_router.router)
+app.include_router(users_router.router)
+app.include_router(notifications_router.router)
 
 
 @app.get("/")
