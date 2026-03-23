@@ -4,7 +4,9 @@ import logging
 from typing import Optional
 
 from fastapi import HTTPException, UploadFile, BackgroundTasks
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
+from api.websocket_manager import manager
 
 from db.database import SessionLocal
 from model.models import (
@@ -300,7 +302,7 @@ class ClaimsController:
         )
 
     @staticmethod
-    def submit_corrections(claim_id: int, req: CorrectionRequest, db: Session, current_user: User) -> dict:
+    async def submit_corrections(claim_id: int, req: CorrectionRequest, db: Session, current_user: User) -> dict:
         claim = ClaimRepository.get_claim_by_id(db, claim_id)
         if not claim:
             raise HTTPException(404, "Claim not found")
@@ -325,6 +327,13 @@ class ClaimsController:
         ClaimRepository.create_audit_log(db, claim_id, "CORRECT", {
                                          "corrections": corrected})
         db.commit()
+
+        if claim.insurer_id:
+            await manager.send_personal_message({
+                "type": "CORRECTIONS_SUBMITTED",
+                "message": f"Hospital submitted field corrections for claim #{claim.id}",
+                "claim_id": claim.id
+            }, str(claim.insurer_id))
 
         return {"message": f"Applied {len(corrected)} corrections", "corrections": corrected}
 
@@ -371,6 +380,13 @@ class ClaimsController:
         db.commit()
 
         background_tasks.add_task(process_claim, claim_id, SessionLocal)
+
+        if claim.insurer_id:
+            await manager.send_personal_message({
+                "type": "DOCUMENT_ADDED",
+                "message": f"Hospital uploaded '{file.filename}' for claim #{claim.id}",
+                "claim_id": claim.id
+            }, str(claim.insurer_id))
 
         return {"message": f"Additional document uploaded. Re-processing claim {claim_id}.", "document_id": doc.id}
 
@@ -421,6 +437,14 @@ class ClaimsController:
                                          "decision": decision, "comments": review_req.comments})
         db.commit()
         db.refresh(claim)
+
+        # Send WebSocket notification to the hospital who created the claim
+        await manager.send_personal_message({
+            "type": "CLAIM_DECISION",
+            "message": f"Claim #{claim.id} decision: {decision}",
+            "claim_id": claim.id,
+            "decision": decision
+        }, str(claim.created_by))
 
         return ClaimStatusResponse(
             id=claim.id,
@@ -636,17 +660,20 @@ class ClaimsController:
             hospital = claim.patient_name  # Fallback if no extracted field exists
             
             for ef in claim.extracted_fields:
+                if not ef.field_value:
+                    continue
+
                 name = ef.field_name.lower()
                 if "diagnosis" in name:
-                    diagnosis = ef.extracted_value
-                elif "total" in name and "amount" in name:
+                    diagnosis = ef.field_value
+                elif "amount" in name and ("total" in name or "bill" in name):
                     try:
-                        clean_amt = ef.extracted_value.replace(",", "").replace("$", "").replace("₹", "").strip()
+                        clean_amt = ef.field_value.replace(",", "").replace("$", "").replace("₹", "").strip()
                         amount = float(clean_amt)
                     except (ValueError, TypeError):
                         pass
                 elif "hospital" in name and "name" in name:
-                    hospital = ef.extracted_value
+                    hospital = ef.field_value
 
             total_revenue_claimed += amount
 

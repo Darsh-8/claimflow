@@ -11,6 +11,7 @@ from service.extraction_service import extract_fields, flatten_fields
 from service.validation_service import validate_claim
 from service.fraud_service import evaluate_claim_fraud_risk
 from service.summary_service import generate_document_summary
+from api.websocket_manager import manager
 
 logger = logging.getLogger(__name__)
 
@@ -84,6 +85,12 @@ async def process_claim(claim_id: int, db_session_factory):
 
             claim.status = ClaimStatus.EXTRACTED
             db.commit()
+            await manager.send_personal_message({
+                "type": "CLAIM_STATUS",
+                "message": f"Document data extracted for claim #{claim_id}",
+                "claim_id": claim_id,
+                "status": "EXTRACTED"
+            }, str(claim.created_by))
         except Exception as e:
             logger.exception(f"Extraction failed for claim {claim_id}: {e}")
             claim.status = ClaimStatus.ERROR
@@ -110,6 +117,12 @@ async def process_claim(claim_id: int, db_session_factory):
 
             claim.status = ClaimStatus.VALIDATED
             db.commit()
+            await manager.send_personal_message({
+                "type": "CLAIM_STATUS",
+                "message": f"Validation rules complete for claim #{claim_id}",
+                "claim_id": claim_id,
+                "status": "VALIDATED"
+            }, str(claim.created_by))
         except Exception as e:
             logger.exception(f"Validation failed for claim {claim_id}: {e}")
             claim.status = ClaimStatus.ERROR
@@ -119,6 +132,25 @@ async def process_claim(claim_id: int, db_session_factory):
         try:
             logger.info(f"Running fraud detection for claim {claim_id}...")
             evaluate_claim_fraud_risk(db, claim_id)
+            
+            # Re-fetch claim for risk score
+            claim_after_fraud = db.query(Claim).filter(Claim.id == claim_id).first()
+            if claim_after_fraud:
+                await manager.send_personal_message({
+                    "type": "FRAUD_COMPLETED",
+                    "message": f"Fraud analysis complete for claim #{claim_id}",
+                    "claim_id": claim_id,
+                    "risk_score": claim_after_fraud.fraud_risk_score
+                }, str(claim_after_fraud.created_by))
+                
+                # If high risk and insurer is assigned, notify the insurer too
+                if claim_after_fraud.fraud_risk_score > 70 and claim_after_fraud.insurer_id:
+                    await manager.send_personal_message({
+                        "type": "HIGH_FRAUD_RISK",
+                        "message": f"High fraud risk ({claim_after_fraud.fraud_risk_score} pts) detected on claim #{claim_id}",
+                        "claim_id": claim_id
+                    }, str(claim_after_fraud.insurer_id))
+                    
         except Exception as e:
             logger.exception(f"Fraud scoring failed for claim {claim_id}: {e}")
             # Non-blocking error for overall claim process

@@ -45,7 +45,7 @@ class AuthController:
         response.set_cookie(
             key="access_token",
             value=f"Bearer {access_token}",
-            httponly=True,
+            httponly=False,
             samesite="lax",
             max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60
         )
@@ -93,7 +93,7 @@ class AuthController:
         response.set_cookie(
             key="access_token",
             value=f"Bearer {access_token}",
-            httponly=True,
+            httponly=False,
             samesite="lax",
             max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60
         )

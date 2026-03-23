@@ -8,6 +8,7 @@ from db.database import engine, Base, SessionLocal
 from api.routes import claims as claims_router
 from api.routes import auth as auth_router
 from api.routes import users as users_router
+from api.routes import notifications as notifications_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -76,6 +77,7 @@ app.add_middleware(
 app.include_router(auth_router.router)
 app.include_router(claims_router.router)
 app.include_router(users_router.router)
+app.include_router(notifications_router.router)
 
 
 @app.get("/")

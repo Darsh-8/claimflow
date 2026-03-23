@@ -69,13 +69,13 @@ async def run_validation(claim_id: int, db: Session = Depends(get_db), current_u
 
 
 @router.put("/{claim_id}/correct")
-def submit_corrections(
+async def submit_corrections(
     claim_id: int,
     req: CorrectionRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role([UserRole.HOSPITAL])),
 ):
-    return ClaimsController.submit_corrections(claim_id, req, db, current_user)
+    return await ClaimsController.submit_corrections(claim_id, req, db, current_user)
 
 
 @router.post("/{claim_id}/upload-additional", response_model=dict)
