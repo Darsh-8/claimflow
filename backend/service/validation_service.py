@@ -23,6 +23,7 @@ from service.icd_data import (
     validate_icd10_format,
     validate_pcs_format,
     lookup_icd10_nlm,
+    lookup_icd10_comprehend,
     is_plausible_medical_code,
 )
 
@@ -219,6 +220,62 @@ async def validate_claim(db: Session, claim_id: int) -> dict:
     else:
         code_validation["icd10"] = {
             "code": None, "valid": False, "message": "No ICD-10 code extracted"}
+
+    # -----------------------------------------------------------------------
+    # Step 5b – Load Comprehend Medical entities from ExtractedFields
+    # -----------------------------------------------------------------------
+    import json as _json
+    comprehend_entities: list[dict] = []
+    comp_fields = [
+        f for f in fields
+        if f.field_name.startswith("comprehend_icd10_") and f.field_name != "comprehend_icd10_codes"
+    ]
+    for cf in comp_fields:
+        if cf.field_value:
+            try:
+                comprehend_entities.append(_json.loads(cf.field_value))
+            except Exception:
+                pass
+
+    # Build comprehend_icd10 block for the code_validation output
+    if comprehend_entities:
+        # Cross-reference LLM code against Comprehend results
+        comp_found, comp_desc, comp_score = False, None, 0.0
+        if icd_code:
+            comp_found, comp_desc, comp_score = lookup_icd10_comprehend(
+                icd_code, comprehend_entities
+            )
+
+        code_validation["comprehend_icd10"] = {
+            "entities_detected": len(comprehend_entities),
+            "top_entities": [
+                {
+                    "code": e.get("icd10_code"),
+                    "description": e.get("description"),
+                    "score": e.get("icd10_score"),
+                    "text": e.get("text"),
+                    "traits": e.get("traits", []),
+                }
+                for e in comprehend_entities[:5]
+            ],
+            "llm_code_confirmed": comp_found if icd_code else None,
+            "llm_code_comprehend_score": comp_score if icd_code else None,
+        }
+
+        # If Comprehend found code but NLM didn't confirm it, upgrade the result
+        if icd_code and comp_found and not code_validation.get("icd10", {}).get("valid"):
+            warnings.append(
+                f"ICD-10 code '{icd_code}' not found in NLM registry but confirmed by "
+                f"AWS Comprehend Medical (score: {comp_score:.2f}) — treat as provisional"
+            )
+            code_validation["icd10"]["comprehend_confirmed"] = True
+            code_validation["icd10"]["comprehend_score"] = comp_score
+    else:
+        code_validation["comprehend_icd10"] = {
+            "entities_detected": 0,
+            "top_entities": [],
+            "message": "Comprehend Medical analysis not yet run or returned no results",
+        }
 
     # -----------------------------------------------------------------------
     # Step 6 – PCS procedure code validation

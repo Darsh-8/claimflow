@@ -28,6 +28,11 @@ class ClaimCreate(BaseModel):
     pass
 
 
+class PolicyLinkRequest(BaseModel):
+    insurer_id: int
+    policy_number: str
+
+
 class ClaimStatusResponse(BaseModel):
     id: int
     status: str
@@ -165,6 +170,26 @@ class ClaimDataResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# --- Comprehend Medical ---
+
+class ComprehendICD10Entity(BaseModel):
+    icd10_code: str
+    description: Optional[str] = None
+    score: float
+    icd10_score: float
+    text: str
+    traits: list[str] = []
+    alternatives: list[dict] = []
+
+
+class ComprehendICD10Response(BaseModel):
+    claim_id: int
+    entities_detected: int
+    top_icd10_codes: list[str] = []
+    entities: list[ComprehendICD10Entity] = []
+    source: str = "aws_comprehend_medical"  # or "cached"
 
 
 # --- Patient History ---

@@ -125,3 +125,33 @@ def is_plausible_medical_code(code: str) -> bool:
     if not code:
         return False
     return code[0].upper() in COMMON_MEDICAL_ICD10_PREFIXES
+
+
+# ---------------------------------------------------------------------------
+# Level 3 – Comprehend Medical cross-reference (synchronous, no network)
+# ---------------------------------------------------------------------------
+
+def lookup_icd10_comprehend(
+    code: str,
+    comprehend_entities: list[dict],
+) -> tuple[bool, Optional[str], float]:
+    """
+    Check if a given ICD-10 code appears in the Comprehend Medical entity list.
+
+    Returns (found, description_or_None, best_score).
+    Score is 0.0 if not found.
+    """
+    if not code or not comprehend_entities:
+        return False, None, 0.0
+
+    normalized = code.strip().upper()
+    for entity in comprehend_entities:
+        # Check primary code
+        if entity.get("icd10_code", "").upper() == normalized:
+            return True, entity.get("description"), entity.get("icd10_score", 0.0)
+        # Check alternative concepts
+        for alt in entity.get("alternatives", []):
+            if alt.get("code", "").upper() == normalized:
+                return True, alt.get("description"), alt.get("score", 0.0)
+
+    return False, None, 0.0
