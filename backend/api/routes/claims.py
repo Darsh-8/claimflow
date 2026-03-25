@@ -8,7 +8,8 @@ from dto.schemas import (
     ClaimStatusResponse, ClaimListItem, ClaimDataResponse,
     ValidationResponse, UploadResponse, CorrectionRequest,
     ClaimReviewRequest, DocumentSummaryResponse, ClaimAnalyticsResponse,
-    PatientHistoryResponse, RoleAnalyticsResponse
+    PatientHistoryResponse, RoleAnalyticsResponse, ComprehendICD10Response,
+    PolicyLinkRequest
 )
 from utils.security import get_current_active_user, require_role
 from api.controller.claims_controller import ClaimsController
@@ -26,6 +27,17 @@ async def upload_documents(
     current_user: User = Depends(require_role([UserRole.HOSPITAL])),
 ):
     return await ClaimsController.upload_documents(background_tasks, files, doc_types, insurer_id, db, current_user)
+
+
+@router.post("/{claim_id}/link-policy", response_model=ClaimStatusResponse)
+def link_policy(
+    claim_id: int,
+    payload: PolicyLinkRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    return ClaimsController.link_policy(claim_id, payload, background_tasks, db, current_user)
 
 
 @router.get("", response_model=list[ClaimListItem])
@@ -117,3 +129,17 @@ def get_patient_history(
     current_user: User = Depends(get_current_active_user),
 ):
     return ClaimsController.get_patient_history(claim_id, db, current_user)
+
+
+@router.get("/{claim_id}/comprehend", response_model=ComprehendICD10Response)
+async def get_comprehend_icd10(
+    claim_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role([UserRole.HOSPITAL, UserRole.INSURER])),
+):
+    """Return AWS Comprehend Medical ICD-10-CM entities for this claim.
+
+    Returns cached entities if the pipeline already ran Comprehend Medical.
+    Falls back to a fresh AWS call if no cached data exists.
+    """
+    return await ClaimsController.get_comprehend_icd10(claim_id, db, current_user)

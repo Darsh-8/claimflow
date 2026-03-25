@@ -1,5 +1,6 @@
 import os
 import uuid
+import json
 import logging
 from typing import Optional
 
@@ -21,10 +22,13 @@ from dto.schemas import (
     ClaimReviewRequest, DocumentSummaryResponse, ClaimAnalyticsResponse, MonthlyStat,
     FraudBucket, DocTypeStat, RecentClaimStat, RejectionReason,
     PatientHistoryClaim, PatientHistoryResponse,
-    RoleAnalyticsResponse, ClinicalTrend, HospitalTrend
+    RoleAnalyticsResponse, ClinicalTrend, HospitalTrend,
+    ComprehendICD10Entity, ComprehendICD10Response,
+    PolicyLinkRequest,
 )
-from service.pipeline import process_claim
+from service.pipeline import run_extraction_pipeline
 from service.validation_service import validate_claim
+from service.comprehend_medical_service import run_comprehend_medical, get_top_icd10_codes
 from config.config import settings
 from dao.claim_repository import ClaimRepository
 
@@ -83,13 +87,57 @@ class ClaimsController:
         )
         db.commit()
 
-        background_tasks.add_task(process_claim, claim.id, SessionLocal)
+        background_tasks.add_task(run_extraction_pipeline, claim.id, SessionLocal)
 
         return UploadResponse(
             claim_id=claim.id,
             message="Documents uploaded successfully. Processing started.",
             documents_uploaded=docs_created,
         )
+
+    @staticmethod
+    def link_policy(
+        claim_id: int,
+        payload: PolicyLinkRequest,
+        background_tasks: BackgroundTasks,
+        db: Session,
+        current_user: User
+    ) -> ClaimStatusResponse:
+        claim = ClaimRepository.get_claim_by_id(db, claim_id)
+        if not claim:
+            raise HTTPException(404, "Claim not found")
+        if claim.created_by != current_user.id:
+            raise HTTPException(403, "Not authorized to modify this claim")
+            
+        claim.insurer_id = payload.insurer_id
+        claim.policy_number = payload.policy_number
+        
+        # Ensure the extracted field for policy number exists
+        from model.models import ExtractedField
+        existing_ef = db.query(ExtractedField).filter(
+            ExtractedField.claim_id == claim_id,
+            ExtractedField.field_category == "policy",
+            ExtractedField.field_name == "policy.policy_number"
+        ).first()
+        
+        if existing_ef:
+            existing_ef.field_value = payload.policy_number
+        else:
+            new_ef = ExtractedField(
+                claim_id=claim_id,
+                field_category="policy",
+                field_name="policy.policy_number",
+                field_value=payload.policy_number,
+                confidence=1.0
+            )
+            db.add(new_ef)
+            
+        db.commit()
+            
+        from service.pipeline import run_validation_pipeline
+        background_tasks.add_task(run_validation_pipeline, claim.id, SessionLocal)
+        
+        return ClaimsController.get_claim_status(claim_id, db, current_user)
 
     @staticmethod
     def list_claims(skip: int, limit: int, db: Session, current_user: User) -> list[ClaimListItem]:
@@ -713,4 +761,135 @@ class ClaimsController:
             total_fraud_savings=total_fraud_savings if current_user.role == UserRole.INSURER else None,
             top_diagnoses=top_diagnoses,
             top_hospitals=top_hospitals
+        )
+
+    # -----------------------------------------------------------------------
+    # Comprehend Medical ICD-10 endpoint
+    # -----------------------------------------------------------------------
+
+    @staticmethod
+    async def get_comprehend_icd10(claim_id: int, db: Session, current_user: User) -> ComprehendICD10Response:
+        claim = ClaimRepository.get_claim_by_id(db, claim_id)
+        if not claim:
+            raise HTTPException(404, "Claim not found")
+
+        # --- Try to serve from cached ExtractedField rows first ---
+        comp_fields = db.query(ExtractedField).filter(
+            ExtractedField.claim_id == claim_id,
+            ExtractedField.field_category == "clinical",
+            ExtractedField.field_name.like("comprehend_icd10_%"),
+        ).all()
+
+        entity_fields = [
+            f for f in comp_fields if f.field_name != "comprehend_icd10_codes"
+        ]
+
+        if entity_fields:
+            entities: list[ComprehendICD10Entity] = []
+            for ef in entity_fields:
+                if not ef.field_value:
+                    continue
+                try:
+                    raw = json.loads(ef.field_value)
+                    entities.append(ComprehendICD10Entity(
+                        icd10_code=raw.get("icd10_code", ""),
+                        description=raw.get("description"),
+                        score=raw.get("score", 0.0),
+                        icd10_score=raw.get("icd10_score", 0.0),
+                        text=raw.get("text", ""),
+                        traits=raw.get("traits", []),
+                        alternatives=raw.get("alternatives", []),
+                    ))
+                except Exception:
+                    continue
+
+            top_codes = get_top_icd10_codes(
+                [e.model_dump() for e in entities]
+            )
+            return ComprehendICD10Response(
+                claim_id=claim_id,
+                entities_detected=len(entities),
+                top_icd10_codes=top_codes,
+                entities=entities,
+                source="cached",
+            )
+
+        # --- No cached data — run Comprehend Medical fresh ---
+        # Build the same focused clinical text the pipeline uses:
+        # diagnosis / condition / procedure extracted by the LLM, NOT raw OCR.
+        CLINICAL_KEYS = ("diagnosis", "secondary_diagnosis", "condition", "symptoms",
+                         "procedure", "treatment", "operation")
+        clinical_fields = db.query(ExtractedField).filter(
+            ExtractedField.claim_id == claim_id,
+            ExtractedField.field_category == "clinical",
+        ).all()
+
+        clinical_parts: list[str] = []
+        # Priority fields first
+        field_map = {f.field_name.split(".")[-1]: f.field_value for f in clinical_fields
+                     if f.field_value and f.field_value.strip().lower() not in ("none", "null", "n/a", "")}
+        for key in CLINICAL_KEYS:
+            val = field_map.get(key) or field_map.get(f"clinical.{key}")
+            if val:
+                clinical_parts.append(val.strip())
+        # Remaining clinical fields as fallback
+        if not clinical_parts:
+            clinical_parts = [v for v in field_map.values() if v and v.strip()]
+
+        comprehend_input = ". ".join(clinical_parts)
+        if not comprehend_input.strip():
+            raise HTTPException(422, "No clinical fields extracted yet. Please wait for claim processing to complete.")
+
+        raw_entities = await run_comprehend_medical(comprehend_input)
+
+        if not raw_entities:
+            return ComprehendICD10Response(
+                claim_id=claim_id,
+                entities_detected=0,
+                top_icd10_codes=[],
+                entities=[],
+                source="aws_comprehend_medical",
+            )
+
+        # Persist for future calls
+        for idx, entity in enumerate(raw_entities[:10]):
+            ef = ExtractedField(
+                claim_id=claim_id,
+                field_category="clinical",
+                field_name=f"comprehend_icd10_{idx + 1}",
+                field_value=json.dumps(entity),
+                confidence=entity.get("score"),
+            )
+            db.add(ef)
+
+        top_codes = get_top_icd10_codes(raw_entities)
+        if top_codes:
+            db.add(ExtractedField(
+                claim_id=claim_id,
+                field_category="clinical",
+                field_name="comprehend_icd10_codes",
+                field_value=", ".join(top_codes),
+                confidence=None,
+            ))
+        db.commit()
+
+        entities = [
+            ComprehendICD10Entity(
+                icd10_code=e.get("icd10_code", ""),
+                description=e.get("description"),
+                score=e.get("score", 0.0),
+                icd10_score=e.get("icd10_score", 0.0),
+                text=e.get("text", ""),
+                traits=e.get("traits", []),
+                alternatives=e.get("alternatives", []),
+            )
+            for e in raw_entities
+        ]
+
+        return ComprehendICD10Response(
+            claim_id=claim_id,
+            entities_detected=len(entities),
+            top_icd10_codes=top_codes,
+            entities=entities,
+            source="aws_comprehend_medical",
         )

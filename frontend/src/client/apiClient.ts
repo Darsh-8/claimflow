@@ -127,6 +127,24 @@ export interface DocumentSummaryResponse {
     created_at: string;
 }
 
+export interface ComprehendICD10Entity {
+    icd10_code: string;
+    description: string | null;
+    score: number;
+    icd10_score: number;
+    text: string;
+    traits: string[];
+    alternatives: { code: string; description: string | null; score: number }[];
+}
+
+export interface ComprehendICD10Response {
+    claim_id: number;
+    entities_detected: number;
+    top_icd10_codes: string[];
+    entities: ComprehendICD10Entity[];
+    source: string; // 'cached' | 'aws_comprehend_medical'
+}
+
 export interface UploadResponse {
     claim_id: number;
     message: string;
@@ -148,13 +166,10 @@ export const usersApi = {
 
 // API methods
 export const claimsApi = {
-    upload: async (files: File[], docTypes: string[], insurerId?: number): Promise<UploadResponse> => {
+    upload: async (files: File[], docTypes: string[]): Promise<UploadResponse> => {
         const formData = new FormData();
         files.forEach((file) => formData.append('files', file));
         docTypes.forEach((dt) => formData.append('doc_types', dt));
-        if (insurerId) {
-            formData.append('insurer_id', insurerId.toString());
-        }
         const { data } = await api.post('/claims/upload', formData, {
             headers: { 'Content-Type': 'multipart/form-data' },
         });
@@ -222,6 +237,19 @@ export const claimsApi = {
 
     getPatientHistory: async (claimId: number): Promise<PatientHistoryResponse> => {
         const { data } = await api.get(`/claims/${claimId}/patient-history`);
+        return data;
+    },
+
+    getComprehendICD10: async (claimId: number): Promise<ComprehendICD10Response> => {
+        const { data } = await api.get(`/claims/${claimId}/comprehend`);
+        return data;
+    },
+
+    linkPolicy: async (id: number, insurerId: number, policyNumber: string): Promise<ClaimStatusResponse> => {
+        const { data } = await api.post(`/claims/${id}/link-policy`, {
+            insurer_id: insurerId,
+            policy_number: policyNumber,
+        });
         return data;
     },
 };

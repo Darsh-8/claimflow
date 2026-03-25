@@ -8,7 +8,8 @@ import StatusBadge from '../components/StatusBadge';
 import FieldEditor from '../components/FieldEditor';
 import ValidationCard from '../components/ValidationCard';
 import FileDropzone from '../components/FileDropzone';
-import { claimsApi, type ClaimDataResponse, type PatientHistoryResponse } from '../client/apiClient';
+import ICD10Card from '../components/ICD10Card';
+import { claimsApi, type ClaimDataResponse, type PatientHistoryResponse, type ComprehendICD10Entity, type UserResponse } from '../client/apiClient';
 import { useAuth } from '../context/AuthContext';
 
 const DOC_TYPE_LABELS: Record<string, string> = {
@@ -55,6 +56,13 @@ export default function ClaimDetailPage() {
     const [patientHistory, setPatientHistory] = useState<PatientHistoryResponse | null>(null);
     const [historyLoading, setHistoryLoading] = useState(false);
 
+    // Missing Policy State
+    const [insurers, setInsurers] = useState<UserResponse[]>([]);
+    const [selectedInsurerId, setSelectedInsurerId] = useState<string>('');
+    const [enteredPolicyNumber, setEnteredPolicyNumber] = useState<string>('');
+    const [linkError, setLinkError] = useState('');
+    const [linkLoading, setLinkLoading] = useState(false);
+
     // Review State
     const [reviewDecision, setReviewDecision] = useState<'APPROVED' | 'REJECTED' | 'INFO_REQUESTED'>('APPROVED');
     const [reviewComments, setReviewComments] = useState('');
@@ -94,6 +102,23 @@ export default function ClaimDetailPage() {
             .finally(() => setHistoryLoading(false));
     }, [id, data?.claim.patient_name, patientHistory]);
 
+    // Fetch Insurers if in EXTRACTED state
+    useEffect(() => {
+        if (data?.claim.status === 'EXTRACTED') {
+            import('../client/apiClient').then(m => m.usersApi.getInsurers().then(setInsurers).catch(console.error));
+
+            // Prefill policy number if OCR caught it
+            if (data.claim.policy_number) {
+                setEnteredPolicyNumber(data.claim.policy_number);
+            } else {
+                const po = data.extracted_fields.find(f => f.field_category === 'policy' && f.field_name === 'policy.policy_number');
+                if (po?.field_value) {
+                    setEnteredPolicyNumber(po.field_value);
+                }
+            }
+        }
+    }, [data?.claim.status, data?.claim.policy_number, data?.extracted_fields]);
+
     const handleFieldSave = (fieldId: number, newValue: string) => {
         setCorrections((prev) => new Map(prev).set(fieldId, newValue));
     };
@@ -113,6 +138,23 @@ export default function ClaimDetailPage() {
             console.error('Failed to save corrections:', err);
         } finally {
             setSaving(false);
+        }
+    };
+
+    const handleLinkPolicySubmit = async () => {
+        if (!id || !selectedInsurerId || !enteredPolicyNumber) {
+            setLinkError('Both Insurer and Policy Number are required.');
+            return;
+        }
+        setLinkError('');
+        setLinkLoading(true);
+        try {
+            await claimsApi.linkPolicy(parseInt(id), parseInt(selectedInsurerId), enteredPolicyNumber);
+            await fetchData();
+        } catch (err: any) {
+            setLinkError(err?.response?.data?.detail || 'Failed to submit policy information.');
+        } finally {
+            setLinkLoading(false);
         }
     };
 
@@ -233,6 +275,16 @@ export default function ClaimDetailPage() {
         { key: 'history' as const, label: 'Patient History', icon: Users, count: patientHistory?.total_past_claims ?? 0 },
     ];
 
+    // Parse cached Comprehend Medical data from extracted fields
+    const comprehendCodeField = data.extracted_fields.find(
+        f => f.field_category === 'clinical' && f.field_name === 'comprehend_icd10_codes'
+    );
+    const cachedEntities: ComprehendICD10Entity[] = data.extracted_fields
+        .filter(f => f.field_category === 'clinical' && f.field_name.match(/^comprehend_icd10_\d+$/))
+        .sort((a, b) => a.field_name.localeCompare(b.field_name, undefined, { numeric: true }))
+        .map(f => { try { return JSON.parse(f.field_value ?? ''); } catch { return null; } })
+        .filter(Boolean) as ComprehendICD10Entity[];
+
     return (
         <div className="animate-fade-in">
             {/* Header */}
@@ -274,6 +326,67 @@ export default function ClaimDetailPage() {
                 </span>
             </div>
 
+            {/* Missing Policy Banner */}
+            {user?.role === 'HOSPITAL' && data.claim.status === 'EXTRACTED' && (
+                <div className="card" style={{ marginBottom: '24px', padding: '24px', border: '2px solid var(--warning)', background: '#fffbeb' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                        <AlertTriangle size={24} style={{ color: 'var(--warning)' }} />
+                        <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 600, color: '#854d0e' }}>
+                            Missing Information Required
+                        </h3>
+                    </div>
+                    <p style={{ margin: '0 0 20px 0', fontSize: '0.9rem', color: '#92400e' }}>
+                        The automated extraction pipeline completed successfully, but this claim has not been assigned to an insurer yet. Please select the insurer and confirm the policy number to proceed to automated validation.
+                    </p>
+                    
+                    {linkError && (
+                        <div style={{ padding: '12px', background: 'var(--error-bg)', color: 'var(--error)', borderRadius: '6px', fontSize: '0.875rem', marginBottom: '16px', border: '1px solid #fecaca' }}>
+                            {linkError}
+                        </div>
+                    )}
+
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px', alignItems: 'flex-end' }}>
+                        <div style={{ flex: 1, minWidth: '250px' }}>
+                            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#92400e', marginBottom: '6px' }}>
+                                Insurer <span style={{ color: 'var(--error)' }}>*</span>
+                            </label>
+                            <select
+                                value={selectedInsurerId}
+                                onChange={(e) => setSelectedInsurerId(e.target.value)}
+                                style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #d1d5db', backgroundColor: 'white' }}
+                                disabled={linkLoading}
+                            >
+                                <option value="">-- Select Insurer --</option>
+                                {insurers.map(i => (
+                                    <option key={i.id} value={i.id}>{i.username}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div style={{ flex: 1, minWidth: '250px' }}>
+                            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#92400e', marginBottom: '6px' }}>
+                                Policy Number <span style={{ color: 'var(--error)' }}>*</span>
+                            </label>
+                            <input
+                                type="text"
+                                value={enteredPolicyNumber}
+                                onChange={(e) => setEnteredPolicyNumber(e.target.value)}
+                                placeholder="Enter policy number..."
+                                style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #d1d5db', backgroundColor: 'white' }}
+                                disabled={linkLoading}
+                            />
+                        </div>
+                        <button 
+                            className="btn btn-primary" 
+                            style={{ padding: '10px 24px', background: '#d97706', borderColor: '#d97706', height: '42px' }}
+                            onClick={handleLinkPolicySubmit}
+                            disabled={linkLoading || !selectedInsurerId || !enteredPolicyNumber}
+                        >
+                            {linkLoading ? 'Submitting...' : 'Submit & Run Validation'}
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* Info Requested Banner */}
             {user?.role === 'HOSPITAL' && data.claim.status === 'INFO_REQUESTED' && (
                 <div style={{ 
@@ -305,10 +418,12 @@ export default function ClaimDetailPage() {
 
                 {user?.role === 'HOSPITAL' && (
                     <>
-                        <button className="btn btn-primary" onClick={runValidation} disabled={validating}>
-                            <ShieldCheck size={15} />
-                            {validating ? 'Validating…' : 'Run Validation'}
-                        </button>
+                        {data.claim.status !== 'EXTRACTED' && (
+                            <button className="btn btn-primary" onClick={runValidation} disabled={validating}>
+                                <ShieldCheck size={15} />
+                                {validating ? 'Validating…' : 'Run Validation'}
+                            </button>
+                        )}
                         {corrections.size > 0 && (
                             <button className="btn btn-secondary" onClick={submitCorrections} disabled={saving}>
                                 <Save size={15} />
@@ -491,6 +606,13 @@ export default function ClaimDetailPage() {
                     </div>
                 </div>
             )}
+
+            {/* ICD-10 Code Analysis Card */}
+            <ICD10Card
+                claimId={data.claim.id}
+                cachedCodes={comprehendCodeField?.field_value ?? undefined}
+                cachedEntities={cachedEntities.length > 0 ? cachedEntities : undefined}
+            />
 
             {/* Tabs */}
             <div style={{ display: 'flex', gap: '0', marginBottom: '20px', borderBottom: '2px solid var(--border)' }}>
