@@ -112,25 +112,37 @@ class ClaimsController:
         claim.insurer_id = payload.insurer_id
         claim.policy_number = payload.policy_number
         
-        # Ensure the extracted field for policy number exists
         from model.models import ExtractedField
-        existing_ef = db.query(ExtractedField).filter(
-            ExtractedField.claim_id == claim_id,
-            ExtractedField.field_category == "policy",
-            ExtractedField.field_name == "policy.policy_number"
-        ).first()
+
+        def _upsert_field(cat: str, name: str, val: str):
+            if not val:
+                return
+            existing = db.query(ExtractedField).filter(
+                ExtractedField.claim_id == claim_id,
+                ExtractedField.field_category == cat,
+                ExtractedField.field_name == name
+            ).first()
+            if existing:
+                existing.field_value = val
+                existing.is_manually_corrected = True
+            else:
+                db.add(ExtractedField(
+                    claim_id=claim_id,
+                    field_category=cat,
+                    field_name=name,
+                    field_value=val,
+                    confidence=1.0,
+                    is_manually_corrected=True
+                ))
+
+        _upsert_field("policy", "policy.policy_number", payload.policy_number)
         
-        if existing_ef:
-            existing_ef.field_value = payload.policy_number
-        else:
-            new_ef = ExtractedField(
-                claim_id=claim_id,
-                field_category="policy",
-                field_name="policy.policy_number",
-                field_value=payload.policy_number,
-                confidence=1.0
-            )
-            db.add(new_ef)
+        if payload.diagnosis:
+            _upsert_field("clinical", "clinical.diagnosis", payload.diagnosis)
+        if payload.icd_code:
+            _upsert_field("clinical", "clinical.icd_code", payload.icd_code)
+        if payload.bill_amount:
+            _upsert_field("financial", "financial.bill_amount", payload.bill_amount)
             
         db.commit()
             
@@ -516,12 +528,13 @@ class ClaimsController:
         claim = ClaimRepository.get_claim_by_id(db, claim_id)
         if not claim:
             raise HTTPException(404, "Claim not found")
-        if not claim.patient_name:
-            raise HTTPException(404, "Patient name not yet extracted for this claim")
 
-        # Find all claims with the same patient name (excluding current)
+        # Only use policy number — patient name is not a unique identifier
+        if not claim.policy_number:
+            raise HTTPException(404, "No policy number available to look up history")
+
         all_claims = db.query(Claim).filter(
-            Claim.patient_name == claim.patient_name,
+            Claim.policy_number == claim.policy_number,
             Claim.id != claim_id
         ).order_by(Claim.created_at.desc()).all()
 
@@ -556,10 +569,11 @@ class ClaimsController:
             ))
 
         return PatientHistoryResponse(
-            patient_name=claim.patient_name,
+            patient_name=claim.patient_name or claim.policy_number,
             total_past_claims=len(history_claims),
             claims=history_claims,
         )
+
 
     @staticmethod
     def get_analytics(db: Session, current_user: User) -> ClaimAnalyticsResponse:

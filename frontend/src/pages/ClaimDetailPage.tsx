@@ -60,6 +60,14 @@ export default function ClaimDetailPage() {
     const [insurers, setInsurers] = useState<UserResponse[]>([]);
     const [selectedInsurerId, setSelectedInsurerId] = useState<string>('');
     const [enteredPolicyNumber, setEnteredPolicyNumber] = useState<string>('');
+    const [enteredDiagnosis, setEnteredDiagnosis] = useState<string>('');
+    const [enteredIcdCode, setEnteredIcdCode] = useState<string>('');
+    const [enteredBillAmount, setEnteredBillAmount] = useState<string>('');
+    
+    const [missingDiagnosis, setMissingDiagnosis] = useState(false);
+    const [missingIcdCode, setMissingIcdCode] = useState(false);
+    const [missingBillAmount, setMissingBillAmount] = useState(false);
+    
     const [linkError, setLinkError] = useState('');
     const [linkLoading, setLinkLoading] = useState(false);
 
@@ -91,16 +99,16 @@ export default function ClaimDetailPage() {
         return () => clearInterval(interval);
     }, [fetchData, data?.claim.status]);
 
-    // Fetch patient history for the badge count and tab content
+    // Fetch patient history by policy number only (names are not unique identifiers)
     useEffect(() => {
-        if (!id || !data?.claim.patient_name) return;
+        if (!id || !data?.claim.policy_number) return;
         if (patientHistory) return; // already loaded
         setHistoryLoading(true);
         claimsApi.getPatientHistory(parseInt(id))
             .then(setPatientHistory)
             .catch(() => setPatientHistory(null))
             .finally(() => setHistoryLoading(false));
-    }, [id, data?.claim.patient_name, patientHistory]);
+    }, [id, data?.claim.policy_number, patientHistory]);
 
     // Fetch Insurers if in EXTRACTED state
     useEffect(() => {
@@ -116,6 +124,27 @@ export default function ClaimDetailPage() {
                     setEnteredPolicyNumber(po.field_value);
                 }
             }
+
+            // Check for missing mandatory fields
+            const hasDiagnosis = data.extracted_fields.some(f => f.field_name === 'clinical.diagnosis' && f.field_value);
+            const hasLlmIcd = data.extracted_fields.some(f => f.field_name === 'clinical.icd_code' && f.field_value);
+            
+            // If Comprehend found ICD codes, use the top one as a fallback for the icd_code field
+            const comprehendCodesField = data.extracted_fields.find(f => f.field_name === 'comprehend_icd10_codes');
+            const topComprehendCode = comprehendCodesField?.field_value
+                ? comprehendCodesField.field_value.split(',')[0].trim()
+                : null;
+            const hasIcdCode = hasLlmIcd || !!topComprehendCode;
+            
+            const hasBillAmount = data.extracted_fields.some(f => f.field_name === 'financial.bill_amount' && f.field_value);
+            
+            setMissingDiagnosis(!hasDiagnosis);
+            setMissingIcdCode(!hasIcdCode);
+            // Pre-fill with top comprehend code so hospital can just confirm rather than type
+            if (!hasLlmIcd && topComprehendCode) {
+                setEnteredIcdCode(topComprehendCode);
+            }
+            setMissingBillAmount(!hasBillAmount);
         }
     }, [data?.claim.status, data?.claim.policy_number, data?.extracted_fields]);
 
@@ -146,10 +175,27 @@ export default function ClaimDetailPage() {
             setLinkError('Both Insurer and Policy Number are required.');
             return;
         }
+        if (missingDiagnosis && !enteredDiagnosis) {
+            setLinkError('Diagnosis is required.');
+            return;
+        }
+                // ICD-10 code is optional — Comprehend Medical provides fallback
+        if (missingBillAmount && !enteredBillAmount) {
+            setLinkError('Bill Amount is required.');
+            return;
+        }
+        
         setLinkError('');
         setLinkLoading(true);
         try {
-            await claimsApi.linkPolicy(parseInt(id), parseInt(selectedInsurerId), enteredPolicyNumber);
+            await claimsApi.linkPolicy(
+                parseInt(id), 
+                parseInt(selectedInsurerId), 
+                enteredPolicyNumber,
+                missingDiagnosis ? enteredDiagnosis : undefined,
+                missingIcdCode ? enteredIcdCode : undefined,
+                missingBillAmount ? enteredBillAmount : undefined
+            );
             await fetchData();
         } catch (err: any) {
             setLinkError(err?.response?.data?.detail || 'Failed to submit policy information.');
@@ -258,9 +304,12 @@ export default function ClaimDetailPage() {
         );
     }
 
-    // Group fields by category
+    // Group fields by category (filtering out raw Comprehend JSON)
     const fieldsByCategory = new Map<string, typeof data.extracted_fields>();
     for (const field of data.extracted_fields) {
+        if (field.field_name.startsWith('comprehend_icd10_')) {
+            continue;
+        }
         if (!fieldsByCategory.has(field.field_category)) {
             fieldsByCategory.set(field.field_category, []);
         }
@@ -336,7 +385,7 @@ export default function ClaimDetailPage() {
                         </h3>
                     </div>
                     <p style={{ margin: '0 0 20px 0', fontSize: '0.9rem', color: '#92400e' }}>
-                        The automated extraction pipeline completed successfully, but this claim has not been assigned to an insurer yet. Please select the insurer and confirm the policy number to proceed to automated validation.
+                        The automated extraction pipeline completed successfully, but some mandatory information is missing. Please provide the details below to proceed to automated validation.
                     </p>
                     
                     {linkError && (
@@ -375,14 +424,65 @@ export default function ClaimDetailPage() {
                                 disabled={linkLoading}
                             />
                         </div>
-                        <button 
-                            className="btn btn-primary" 
-                            style={{ padding: '10px 24px', background: '#d97706', borderColor: '#d97706', height: '42px' }}
-                            onClick={handleLinkPolicySubmit}
-                            disabled={linkLoading || !selectedInsurerId || !enteredPolicyNumber}
-                        >
-                            {linkLoading ? 'Submitting...' : 'Submit & Run Validation'}
-                        </button>
+                        
+                        {missingDiagnosis && (
+                            <div style={{ flex: 1, minWidth: '250px' }}>
+                                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#92400e', marginBottom: '6px' }}>
+                                    Diagnosis <span style={{ color: 'var(--error)' }}>*</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    value={enteredDiagnosis}
+                                    onChange={(e) => setEnteredDiagnosis(e.target.value)}
+                                    placeholder="Enter diagnosis..."
+                                    style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #d1d5db', backgroundColor: 'white' }}
+                                    disabled={linkLoading}
+                                />
+                            </div>
+                        )}
+
+                        {missingIcdCode && (
+                            <div style={{ flex: 1, minWidth: '250px' }}>
+                                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#92400e', marginBottom: '6px' }}>
+                                    ICD-10 Code <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: '0.78rem' }}>(optional)</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    value={enteredIcdCode}
+                                    onChange={(e) => setEnteredIcdCode(e.target.value)}
+                                    placeholder="e.g. A01.0"
+                                    style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #d1d5db', backgroundColor: 'white' }}
+                                    disabled={linkLoading}
+                                />
+                            </div>
+                        )}
+
+                        {missingBillAmount && (
+                            <div style={{ flex: 1, minWidth: '250px' }}>
+                                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#92400e', marginBottom: '6px' }}>
+                                    Total Bill Amount <span style={{ color: 'var(--error)' }}>*</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    value={enteredBillAmount}
+                                    onChange={(e) => setEnteredBillAmount(e.target.value)}
+                                    placeholder="e.g. ₹55,000"
+                                    style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #d1d5db', backgroundColor: 'white' }}
+                                    disabled={linkLoading}
+                                />
+                            </div>
+                        )}
+                        
+                        <div style={{ width: '100%', display: 'flex', justifyContent: 'flex-start', marginTop: '10px' }}>
+                            <button 
+                                className="btn btn-primary" 
+                                style={{ padding: '10px 24px', background: '#d97706', borderColor: '#d97706', height: '42px' }}
+                                onClick={handleLinkPolicySubmit}
+                                disabled={linkLoading || !selectedInsurerId || !enteredPolicyNumber}
+                            >
+                                {linkLoading ? 'Submitting...' : 'Submit & Run Validation'}
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
@@ -675,8 +775,8 @@ export default function ClaimDetailPage() {
                                             fieldId={field.id}
                                             label={field.field_name}
                                             value={corrections.has(field.id) ? corrections.get(field.id)! : field.field_value}
-                                            confidence={field.confidence}
                                             isCorrected={field.is_manually_corrected || corrections.has(field.id)}
+                                            canEdit={user?.role === 'HOSPITAL'}
                                             onSave={handleFieldSave}
                                         />
                                     ))}

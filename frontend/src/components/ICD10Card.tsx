@@ -34,7 +34,6 @@ export default function ICD10Card({ claimId, cachedCodes, cachedEntities }: Prop
         try {
             const result = await claimsApi.getComprehendICD10(claimId);
             setEntities(result.entities);
-            setSource(result.source);
             setFetched(true);
         } catch (err: any) {
             setError(err?.response?.data?.detail ?? 'Failed to fetch ICD-10 codes. OCR may not be complete yet.');

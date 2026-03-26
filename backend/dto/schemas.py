@@ -31,6 +31,9 @@ class ClaimCreate(BaseModel):
 class PolicyLinkRequest(BaseModel):
     insurer_id: int
     policy_number: str
+    diagnosis: Optional[str] = None
+    icd_code: Optional[str] = None
+    bill_amount: Optional[str] = None
 
 
 class ClaimStatusResponse(BaseModel):

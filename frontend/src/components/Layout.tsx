@@ -13,8 +13,11 @@ export default function Layout() {
 
     const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
         const val = e.target.value;
-        if (val) setSearchParams({ q: val });
-        else setSearchParams({});
+        if (val) {
+            navigate(`/?q=${encodeURIComponent(val)}`);
+        } else {
+            navigate('/');
+        }
     };
     const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
     const [isSettingsMode, setIsSettingsMode] = useState(false);
