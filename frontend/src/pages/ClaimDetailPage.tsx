@@ -64,6 +64,7 @@ export default function ClaimDetailPage() {
     const [enteredIcdCode, setEnteredIcdCode] = useState<string>('');
     const [enteredBillAmount, setEnteredBillAmount] = useState<string>('');
     
+    const [missingPolicyNumber, setMissingPolicyNumber] = useState(false);
     const [missingDiagnosis, setMissingDiagnosis] = useState(false);
     const [missingIcdCode, setMissingIcdCode] = useState(false);
     const [missingBillAmount, setMissingBillAmount] = useState(false);
@@ -116,14 +117,20 @@ export default function ClaimDetailPage() {
             import('../client/apiClient').then(m => m.usersApi.getInsurers().then(setInsurers).catch(console.error));
 
             // Prefill policy number if OCR caught it
+            let foundPolicy = '';
             if (data.claim.policy_number) {
-                setEnteredPolicyNumber(data.claim.policy_number);
+                foundPolicy = data.claim.policy_number;
             } else {
                 const po = data.extracted_fields.find(f => f.field_category === 'policy' && f.field_name === 'policy.policy_number');
                 if (po?.field_value) {
-                    setEnteredPolicyNumber(po.field_value);
+                    foundPolicy = po.field_value;
                 }
             }
+            if (foundPolicy) {
+                setEnteredPolicyNumber(foundPolicy);
+            }
+            // Add a new piece of state to track missing policy number
+            setMissingPolicyNumber(!foundPolicy);
 
             // Check for missing mandatory fields
             const hasDiagnosis = data.extracted_fields.some(f => f.field_name === 'clinical.diagnosis' && f.field_value);
@@ -136,7 +143,11 @@ export default function ClaimDetailPage() {
                 : null;
             const hasIcdCode = hasLlmIcd || !!topComprehendCode;
             
-            const hasBillAmount = data.extracted_fields.some(f => f.field_name === 'financial.bill_amount' && f.field_value);
+            // Look for either bill_amount or total_bill_amount
+            const hasBillAmount = data.extracted_fields.some(f => 
+                (f.field_name === 'financial.bill_amount' || f.field_name === 'financial.total_bill_amount') 
+                && f.field_value
+            );
             
             setMissingDiagnosis(!hasDiagnosis);
             setMissingIcdCode(!hasIcdCode);
@@ -411,19 +422,21 @@ export default function ClaimDetailPage() {
                                 ))}
                             </select>
                         </div>
-                        <div style={{ flex: 1, minWidth: '250px' }}>
-                            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#92400e', marginBottom: '6px' }}>
-                                Policy Number <span style={{ color: 'var(--error)' }}>*</span>
-                            </label>
-                            <input
-                                type="text"
-                                value={enteredPolicyNumber}
-                                onChange={(e) => setEnteredPolicyNumber(e.target.value)}
-                                placeholder="Enter policy number..."
-                                style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #d1d5db', backgroundColor: 'white' }}
-                                disabled={linkLoading}
-                            />
-                        </div>
+                        {missingPolicyNumber && (
+                            <div style={{ flex: 1, minWidth: '250px' }}>
+                                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#92400e', marginBottom: '6px' }}>
+                                    Policy Number <span style={{ color: 'var(--error)' }}>*</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    value={enteredPolicyNumber}
+                                    onChange={(e) => setEnteredPolicyNumber(e.target.value)}
+                                    placeholder="Enter policy number..."
+                                    style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #d1d5db', backgroundColor: 'white' }}
+                                    disabled={linkLoading}
+                                />
+                            </div>
+                        )}
                         
                         {missingDiagnosis && (
                             <div style={{ flex: 1, minWidth: '250px' }}>
