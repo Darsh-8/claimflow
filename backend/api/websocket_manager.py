@@ -21,6 +21,8 @@ class ConnectionManager:
                 del self.active_connections[user_id]
 
     async def send_personal_message(self, message: dict, user_id: str):
+        if not user_id or user_id == "None":
+            return  # claim.created_by is not set — skip silently
         if user_id in self.active_connections:
             for connection in self.active_connections[user_id]:
                 try:
