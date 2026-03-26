@@ -1,4 +1,6 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { Toaster } from 'sonner';
+
 import Layout from './components/Layout';
 import DashboardPage from './pages/DashboardPage';
 import PerformanceDashboardPage from './pages/PerformanceDashboardPage';
@@ -9,7 +11,6 @@ import LoginPage from './pages/LoginPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import { useAuth } from './context/AuthContext';
-import { Navigate, Outlet } from 'react-router-dom';
 
 const PrivateRoute = () => {
   const { isAuthenticated } = useAuth();
@@ -19,6 +20,7 @@ const PrivateRoute = () => {
 export default function App() {
   return (
     <BrowserRouter>
+      <Toaster position="top-right" richColors />
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />

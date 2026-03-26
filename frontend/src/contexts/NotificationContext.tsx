@@ -1,5 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { toast } from 'sonner';
 
 import { useAuth } from '../context/AuthContext';
 
@@ -8,7 +9,8 @@ type NotificationType =
   | 'FRAUD_RISK_DETECTED' 
   | 'CLAIM_DECISION' 
   | 'CORRECTIONS_SUBMITTED' 
-  | 'DOCUMENT_ADDED';
+  | 'DOCUMENT_ADDED'
+  | 'CLAIM_STATUS';
 
 export interface Notification {
   id: string;
@@ -84,7 +86,15 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
         setNotifications((prev) => [newNotification, ...prev]);
         
-        // You could also add a toaster notification here if desired
+        if (data.type === 'FRAUD_RISK_DETECTED') {
+          toast.error(data.message, { description: 'Fraud Risk Flagged' });
+        } else if (data.status === 'EXTRACTED') {
+          toast.warning(data.message, { description: 'Claim Requires Policy Assignment' });
+        } else if (data.type === 'CLAIM_DECISION') {
+          toast.info(data.message, { description: 'Claim Evaluated' });
+        } else {
+          toast.success(data.message, { description: data.type });
+        }
       } catch (error) {
         console.error('Failed to parse notification:', error);
       }

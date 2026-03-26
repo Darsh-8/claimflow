@@ -57,7 +57,8 @@ export default function DashboardPage() {
         ? claims.filter(c =>
             String(c.id).includes(q) ||
             (c.patient_name ?? '').toLowerCase().includes(q) ||
-            (c.policy_number ?? '').toLowerCase().includes(q)
+            (c.policy_number ?? '').toLowerCase().includes(q) ||
+            (c.status ?? '').toLowerCase().includes(q)
         )
         : claims;
 

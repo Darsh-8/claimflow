@@ -245,11 +245,23 @@ export const claimsApi = {
         return data;
     },
 
-    linkPolicy: async (id: number, insurerId: number, policyNumber: string): Promise<ClaimStatusResponse> => {
-        const { data } = await api.post(`/claims/${id}/link-policy`, {
+    linkPolicy: async (
+        id: number, 
+        insurerId: number, 
+        policyNumber: string,
+        diagnosis?: string,
+        icdCode?: string,
+        billAmount?: string
+    ): Promise<ClaimStatusResponse> => {
+        const payload: Record<string, any> = {
             insurer_id: insurerId,
             policy_number: policyNumber,
-        });
+        };
+        if (diagnosis) payload.diagnosis = diagnosis;
+        if (icdCode) payload.icd_code = icdCode;
+        if (billAmount) payload.bill_amount = billAmount;
+        
+        const { data } = await api.post(`/claims/${id}/link-policy`, payload);
         return data;
     },
 };
