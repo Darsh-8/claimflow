@@ -21,30 +21,8 @@ async def lifespan(app: FastAPI):
     logger.info("Database tables created")
 
     # Seed Test Users
-    from model.models import User, UserRole
-    from utils.security import get_password_hash
-    with SessionLocal() as db:
-        # Ensure all required demo accounts are seeded
-        demo_accounts = [
-            {"username": "demo_hospital", "password": "password123", "role": UserRole.HOSPITAL},
-            {"username": "demo_hospital_2", "password": "password123", "role": UserRole.HOSPITAL},
-            {"username": "demo_insurer", "password": "password123", "role": UserRole.INSURER},
-            {"username": "demo_insurer_2", "password": "password123", "role": UserRole.INSURER},
-        ]
-
-        added_any = False
-        for account in demo_accounts:
-            if not db.query(User).filter_by(username=account["username"]).first():
-                db.add(User(
-                    username=account["username"],
-                    hashed_password=get_password_hash(account["password"]),
-                    role=account["role"]
-                ))
-                added_any = True
-        
-        if added_any:
-            db.commit()
-            logger.info("Admin/Test Users seeded successfully")
+    from db.seed import seed_demo_accounts
+    seed_demo_accounts()
 
     yield
     logger.info("Shutting down")
