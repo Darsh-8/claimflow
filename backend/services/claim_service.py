@@ -2,6 +2,7 @@ import os
 import uuid
 import json
 import logging
+import aiofiles
 from pathlib import Path
 from typing import Optional
 
@@ -59,8 +60,8 @@ class ClaimService:
                 raise HTTPException(400, "Path traversal attempt detected.")
                 
             content = await file.read()
-            with open(file_path, "wb") as f:
-                f.write(content)
+            async with aiofiles.open(file_path, "wb") as f:
+                await f.write(content)
 
             ClaimRepository.create_document(
                 db=db, claim_id=claim.id, doc_type=doc_type, file_path=file_path,
@@ -230,8 +231,8 @@ class ClaimService:
             raise HTTPException(400, "Path traversal attempt detected.")
             
         content = await file.read()
-        with open(file_path, "wb") as f: 
-            f.write(content)
+        async with aiofiles.open(file_path, "wb") as f: 
+            await f.write(content)
         doc = ClaimRepository.create_document(db=db, claim_id=claim.id, doc_type=doc_type, file_path=file_path, original_filename=file.filename or "unknown", mime_type=file.content_type)
         ClaimRepository.create_audit_log(db, claim.id, "UPLOAD_ADDITIONAL", {"filename": file.filename, "doc_type": doc_type})
         status_val = claim.status.value if hasattr(claim.status, "value") else claim.status
