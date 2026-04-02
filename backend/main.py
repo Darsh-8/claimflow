@@ -37,7 +37,10 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS — allow frontend dev server
+# Add request logging middleware
+app.add_middleware(RequestLoggingMiddleware)
+
+# CORS — allow frontend dev server (MUST be added last so it's the outermost middleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -50,10 +53,8 @@ app.add_middleware(
     ],
     allow_credentials=True,
     allow_methods=["*"],
+    allow_headers=["*"],
 )
-
-# Add request logging middleware
-app.add_middleware(RequestLoggingMiddleware)
 
 # Include routers
 app.include_router(auth_router.router)
