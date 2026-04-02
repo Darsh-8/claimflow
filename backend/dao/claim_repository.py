@@ -1,6 +1,6 @@
 from typing import List, Optional, Tuple, Dict, Any
 from sqlalchemy.orm import Session
-from model.models import (
+from models.models import (
     Claim, Document, ExtractedField, ValidationResult, AuditLog, FraudAlert,
     DocumentSummary, ClaimStatus, DocumentType, OCRStatus, ValidationStatus
 )

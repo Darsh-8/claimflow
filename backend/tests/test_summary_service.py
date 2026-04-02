@@ -3,7 +3,7 @@ Unit tests for the document summary service.
 Tests the fallback summary builder and mocked LLM path.
 """
 
-from service.summary_service import generate_document_summary, _build_fallback_summary
+from services.summary_service import generate_document_summary, _build_fallback_summary
 import json
 import os
 import sys

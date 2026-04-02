@@ -1,4 +1,4 @@
-from service.ocr_service import _pdf_to_images, run_ocr
+from services.ocr_service import _pdf_to_images, run_ocr
 from main import app
 import os
 import sys
