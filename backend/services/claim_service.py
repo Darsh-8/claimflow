@@ -37,6 +37,25 @@ class ClaimService:
     """Service layer for Claim business logic (SOLID SRP)."""
 
     @staticmethod
+    async def _save_upload_file(claim_id: int, file: UploadFile) -> str:
+        """Securely sanitizes, checks bounds, and asynchronously saves an uploaded file."""
+        ext = os.path.splitext(os.path.basename(file.filename or "doc"))[1]
+        ext = "".join(c for c in ext if c.isalnum() or c == ".")
+        unique_name = f"{claim_id}_{uuid.uuid4().hex[:8]}{ext}"
+        
+        upload_dir = Path(settings.UPLOAD_DIR).resolve()
+        file_path = (upload_dir / unique_name).resolve()
+        
+        if upload_dir not in file_path.parents:
+            raise HTTPException(400, "Path traversal attempt detected.")
+            
+        content = await file.read()
+        async with aiofiles.open(file_path, "wb") as f:
+            await f.write(content)
+            
+        return str(file_path)
+
+    @staticmethod
     async def upload_documents(background_tasks: BackgroundTasks, files: list[UploadFile], doc_types: list[str], insurer_id: Optional[int], db: Session, current_user: User) -> UploadResponse:
         if len(files) != len(doc_types):
             raise HTTPException(400, "Number of files and doc_types must match")
@@ -49,19 +68,7 @@ class ClaimService:
         docs_created = 0
 
         for file, doc_type in zip(files, doc_types):
-            ext = os.path.splitext(os.path.basename(file.filename or "doc"))[1]
-            ext = "".join(c for c in ext if c.isalnum() or c == ".")
-            unique_name = f"{claim.id}_{uuid.uuid4().hex[:8]}{ext}"
-            
-            upload_dir = Path(settings.UPLOAD_DIR).resolve()
-            file_path = (upload_dir / unique_name).resolve()
-            
-            if upload_dir not in file_path.parents:
-                raise HTTPException(400, "Path traversal attempt detected.")
-                
-            content = await file.read()
-            async with aiofiles.open(file_path, "wb") as f:
-                await f.write(content)
+            file_path = await ClaimService._save_upload_file(claim.id, file)
 
             ClaimRepository.create_document(
                 db=db, claim_id=claim.id, doc_type=doc_type, file_path=file_path,
@@ -220,19 +227,9 @@ class ClaimService:
     async def upload_additional_document(claim: Claim, background_tasks: BackgroundTasks, file: UploadFile, doc_type: str, db: Session) -> dict:
         valid_types = {e.value for e in DocumentType}
         if doc_type not in valid_types: raise HTTPException(400, f"Invalid doc_type: {doc_type}")
-        ext = os.path.splitext(os.path.basename(file.filename or "doc"))[1]
-        ext = "".join(c for c in ext if c.isalnum() or c == ".")
-        unique_name = f"{claim.id}_{uuid.uuid4().hex[:8]}{ext}"
         
-        upload_dir = Path(settings.UPLOAD_DIR).resolve()
-        file_path = (upload_dir / unique_name).resolve()
+        file_path = await ClaimService._save_upload_file(claim.id, file)
         
-        if upload_dir not in file_path.parents:
-            raise HTTPException(400, "Path traversal attempt detected.")
-            
-        content = await file.read()
-        async with aiofiles.open(file_path, "wb") as f: 
-            await f.write(content)
         doc = ClaimRepository.create_document(db=db, claim_id=claim.id, doc_type=doc_type, file_path=file_path, original_filename=file.filename or "unknown", mime_type=file.content_type)
         ClaimRepository.create_audit_log(db, claim.id, "UPLOAD_ADDITIONAL", {"filename": file.filename, "doc_type": doc_type})
         status_val = claim.status.value if hasattr(claim.status, "value") else claim.status
