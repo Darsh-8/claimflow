@@ -2,6 +2,7 @@ import os
 import uuid
 import json
 import logging
+from pathlib import Path
 from typing import Optional
 
 from fastapi import HTTPException, UploadFile, BackgroundTasks
@@ -47,9 +48,16 @@ class ClaimService:
         docs_created = 0
 
         for file, doc_type in zip(files, doc_types):
-            ext = os.path.splitext(file.filename or "doc")[1]
+            ext = os.path.splitext(os.path.basename(file.filename or "doc"))[1]
+            ext = "".join(c for c in ext if c.isalnum() or c == ".")
             unique_name = f"{claim.id}_{uuid.uuid4().hex[:8]}{ext}"
-            file_path = os.path.join(settings.UPLOAD_DIR, unique_name)
+            
+            upload_dir = Path(settings.UPLOAD_DIR).resolve()
+            file_path = (upload_dir / unique_name).resolve()
+            
+            if upload_dir not in file_path.parents:
+                raise HTTPException(400, "Path traversal attempt detected.")
+                
             content = await file.read()
             with open(file_path, "wb") as f:
                 f.write(content)
@@ -211,11 +219,19 @@ class ClaimService:
     async def upload_additional_document(claim: Claim, background_tasks: BackgroundTasks, file: UploadFile, doc_type: str, db: Session) -> dict:
         valid_types = {e.value for e in DocumentType}
         if doc_type not in valid_types: raise HTTPException(400, f"Invalid doc_type: {doc_type}")
-        ext = os.path.splitext(file.filename or "doc")[1]
+        ext = os.path.splitext(os.path.basename(file.filename or "doc"))[1]
+        ext = "".join(c for c in ext if c.isalnum() or c == ".")
         unique_name = f"{claim.id}_{uuid.uuid4().hex[:8]}{ext}"
-        file_path = os.path.join(settings.UPLOAD_DIR, unique_name)
+        
+        upload_dir = Path(settings.UPLOAD_DIR).resolve()
+        file_path = (upload_dir / unique_name).resolve()
+        
+        if upload_dir not in file_path.parents:
+            raise HTTPException(400, "Path traversal attempt detected.")
+            
         content = await file.read()
-        with open(file_path, "wb") as f: f.write(content)
+        with open(file_path, "wb") as f: 
+            f.write(content)
         doc = ClaimRepository.create_document(db=db, claim_id=claim.id, doc_type=doc_type, file_path=file_path, original_filename=file.filename or "unknown", mime_type=file.content_type)
         ClaimRepository.create_audit_log(db, claim.id, "UPLOAD_ADDITIONAL", {"filename": file.filename, "doc_type": doc_type})
         status_val = claim.status.value if hasattr(claim.status, "value") else claim.status
