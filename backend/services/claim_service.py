@@ -19,7 +19,7 @@ from services.comprehend_medical_service import get_top_icd10_codes
 
 from models.models import (
     Claim, Document, ExtractedField, ValidationResult, AuditLog, FraudAlert,
-    DocumentSummary, ClaimStatus, DocumentType, OCRStatus, ValidationStatus,
+    DocumentSummary, Notification, ClaimStatus, DocumentType, OCRStatus, ValidationStatus,
     User, UserRole, utcnow
 )
 
@@ -32,6 +32,24 @@ from schemas.schemas import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+async def _notify(db: Session, user_id: int, notif_type: str, message: str, claim_id: int = None, extra_data: dict = None):
+    """Persist a notification to DB and deliver via WebSocket if user is online."""
+    notif = Notification(
+        user_id=user_id,
+        type=notif_type,
+        message=message,
+        claim_id=claim_id,
+        extra_data=extra_data,
+        read=False,
+    )
+    db.add(notif)
+    db.flush()  # get notif.id before commit
+    payload = {"type": notif_type, "message": message, "claim_id": claim_id, "notification_id": notif.id}
+    if extra_data:
+        payload.update(extra_data)
+    await manager.send_personal_message(payload, str(user_id))
 
 class ClaimService:
     """Service layer for Claim business logic (SOLID SRP)."""
@@ -234,7 +252,7 @@ class ClaimService:
         ClaimRepository.create_audit_log(db, claim.id, "UPLOAD_ADDITIONAL", {"filename": file.filename, "doc_type": doc_type})
         status_val = claim.status.value if hasattr(claim.status, "value") else claim.status
         if status_val == ClaimStatus.INFO_REQUESTED.value:
-            claim.status = ClaimStatus.PROCESSING
+            claim.status = ClaimStatus.VALIDATED
             claim.reviewer_decision = None
             claim.reviewer_comments = None
             claim.reviewed_at = None
@@ -242,8 +260,11 @@ class ClaimService:
         # Assume background process setup logic exists
         # background_tasks.add_task(process_claim, claim.id, SessionLocal) 
         if claim.insurer_id:
-            await manager.send_personal_message({"type": "DOCUMENT_ADDED", "message": f"Hospital uploaded '{file.filename}' for claim #{claim.id}", "claim_id": claim.id}, str(claim.insurer_id))
-        return {"message": f"Additional document uploaded. Re-processing claim {claim.id}.", "document_id": doc.id}
+            await _notify(db, claim.insurer_id, "DOCUMENT_ADDED",
+                          f"Hospital uploaded '{file.filename}' for Claim #{claim.id}. Please review and update your decision.",
+                          claim_id=claim.id)
+        db.commit()
+        return {"message": f"Additional document uploaded. Claim {claim.id} is ready for review.", "document_id": doc.id}
 
     @staticmethod
     async def review_claim(claim: Claim, review_req: ClaimReviewRequest, db: Session) -> ClaimStatusResponse:
@@ -254,10 +275,20 @@ class ClaimService:
         claim.reviewed_at = utcnow()
         if decision == "APPROVED": ClaimRepository.update_claim_status(db, claim, ClaimStatus.APPROVED)
         elif decision == "REJECTED": ClaimRepository.update_claim_status(db, claim, ClaimStatus.REJECTED)
+        elif decision == "INFO_REQUESTED": ClaimRepository.update_claim_status(db, claim, ClaimStatus.INFO_REQUESTED)
         ClaimRepository.create_audit_log(db, claim.id, "REVIEW_SUBMITTED", {"decision": decision, "comments": review_req.comments})
         db.commit()
         db.refresh(claim)
-        await manager.send_personal_message({"type": "CLAIM_DECISION", "message": f"Claim #{claim.id} decision: {decision}", "claim_id": claim.id, "decision": decision}, str(claim.created_by))
+        if claim.created_by:
+            decision_messages = {
+                "APPROVED": f"Claim #{claim.id} has been approved.",
+                "REJECTED": f"Claim #{claim.id} has been rejected.",
+                "INFO_REQUESTED": f"Claim #{claim.id}: The insurer has requested additional information. Please upload the required documents.",
+            }
+            await _notify(db, claim.created_by, "CLAIM_DECISION",
+                          decision_messages.get(decision, f"Claim #{claim.id} decision: {decision}"),
+                          claim_id=claim.id, extra_data={"decision": decision})
+            db.commit()
         return ClaimService.get_claim_status(claim, db)
 
     @staticmethod

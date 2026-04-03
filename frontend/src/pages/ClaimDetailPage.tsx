@@ -576,14 +576,14 @@ export default function ClaimDetailPage() {
 
             {/* Insurer Action Panel */}
             {(user?.role === 'INSURER' || data.claim.reviewer_decision) && (
-                <div className="card" style={{ marginBottom: '24px', padding: '24px', border: '2px solid var(--accent-light)', background: '#FAFAFD' }}>
+                <div className="card" style={{ marginBottom: '24px', padding: '24px', border: '2px solid var(--accent-light)', background: 'var(--bg-card)' }}>
                     <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '16px', color: 'var(--accent-blue)', display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <ShieldCheck size={18} />
                         Insurer Decision Panel
                     </h3>
 
                     {data.claim.reviewer_decision ? (
-                        <div style={{ background: 'white', padding: '16px', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                        <div style={{ background: 'var(--border-subtle)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border)' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
                                 <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>Final Decision:</span>
                                 <span style={{
@@ -613,7 +613,7 @@ export default function ClaimDetailPage() {
                             )}
                         </div>
                     ) : user?.role === 'INSURER' ? (
-                        <div style={{ background: 'white', padding: '16px', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                        <div style={{ background: 'var(--border-subtle)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border)' }}>
                             <div style={{ display: 'flex', gap: '24px', marginBottom: '20px' }}>
                                 <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.875rem', fontWeight: 500 }}>
                                     <input
@@ -660,7 +660,8 @@ export default function ClaimDetailPage() {
                                     style={{
                                         width: '100%', minHeight: '80px', padding: '12px',
                                         border: '1px solid var(--border)', borderRadius: '6px',
-                                        fontSize: '0.875rem', fontFamily: 'inherit', resize: 'vertical'
+                                        fontSize: '0.875rem', fontFamily: 'inherit', resize: 'vertical',
+                                        background: 'var(--bg-card)', color: 'var(--text-primary)'
                                     }}
                                 />
                             </div>

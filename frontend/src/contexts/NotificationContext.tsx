@@ -3,17 +3,19 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 import { useAuth } from '../context/AuthContext';
+import { notificationsApi, type PersistedNotification } from '../client/apiClient';
 
-type NotificationType = 
-  | 'CLAIM_STATUS_UPDATED' 
-  | 'FRAUD_RISK_DETECTED' 
-  | 'CLAIM_DECISION' 
-  | 'CORRECTIONS_SUBMITTED' 
+type NotificationType =
+  | 'CLAIM_STATUS_UPDATED'
+  | 'FRAUD_RISK_DETECTED'
+  | 'CLAIM_DECISION'
+  | 'CORRECTIONS_SUBMITTED'
   | 'DOCUMENT_ADDED'
   | 'CLAIM_STATUS';
 
 export interface Notification {
-  id: string;
+  id: string;        // local UUID for React key
+  db_id?: number;    // server-side DB id (for mark-read API calls)
   type: NotificationType;
   message: string;
   claim_id?: number;
@@ -32,10 +34,35 @@ interface NotificationContextProps {
 
 const NotificationContext = createContext<NotificationContextProps | undefined>(undefined);
 
+function fromPersisted(n: PersistedNotification): Notification {
+  return {
+    id: `db-${n.id}`,
+    db_id: n.id,
+    type: n.type as NotificationType,
+    message: n.message,
+    claim_id: n.claim_id ?? undefined,
+    decision: n.extra_data?.decision,
+    read: n.read,
+    timestamp: n.created_at,
+  };
+}
+
 export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const { isAuthenticated } = useAuth();
 
+  // Load persisted notifications from the server when the user logs in
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setNotifications([]);
+      return;
+    }
+    notificationsApi.list().then((persisted) => {
+      setNotifications(persisted.map(fromPersisted));
+    }).catch(() => {/* ignore — WS-only fallback */});
+  }, [isAuthenticated]);
+
+  // WebSocket for real-time notifications
   useEffect(() => {
     if (!isAuthenticated) return;
 
@@ -69,7 +96,6 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       const wsBaseUrl = apiUrl.replace(/^http/, 'ws');
       const wsUrl = `${wsBaseUrl}/notifications/ws?token=${tokenStr}`;
 
-      console.log('[WS] Connecting to', wsUrl);
       ws = new WebSocket(wsUrl);
 
       ws.onopen = () => {
@@ -81,23 +107,35 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
           const data = JSON.parse(event.data);
 
           const newNotification: Notification = {
-            id: Math.random().toString(36).substring(2, 9),
+            id: data.notification_id ? `db-${data.notification_id}` : Math.random().toString(36).substring(2, 9),
+            db_id: data.notification_id,
             type: data.type,
             message: data.message,
             claim_id: data.claim_id,
             decision: data.decision,
             read: false,
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
           };
 
-          setNotifications((prev) => [newNotification, ...prev]);
+          // Deduplicate: if we already have this db_id (from initial load), update in place
+          setNotifications((prev) => {
+            if (newNotification.db_id && prev.some(n => n.db_id === newNotification.db_id)) {
+              return prev; // already loaded via REST
+            }
+            return [newNotification, ...prev];
+          });
 
           if (data.type === 'FRAUD_RISK_DETECTED') {
             toast.error(data.message, { description: 'Fraud Risk Flagged' });
           } else if (data.type === 'CLAIM_STATUS' && data.status === 'EXTRACTED') {
             toast.warning(data.message, { description: 'Claim Requires Policy Assignment' });
           } else if (data.type === 'CLAIM_DECISION') {
-            toast.info(data.message, { description: 'Claim Evaluated' });
+            const desc = data.decision === 'INFO_REQUESTED'
+              ? 'Action Required'
+              : data.decision === 'APPROVED' ? 'Claim Approved' : 'Claim Rejected';
+            toast.info(data.message, { description: desc });
+          } else if (data.type === 'DOCUMENT_ADDED') {
+            toast.info(data.message, { description: 'New Document Uploaded' });
           } else {
             toast.success(data.message, { description: data.type?.replace(/_/g, ' ') });
           }
@@ -111,8 +149,6 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       };
 
       ws.onclose = (event) => {
-        console.log('[WS] Connection closed, code:', event.code);
-        // Auto-reconnect after 3s (unless intentionally closed with code 1000/1008)
         if (event.code !== 1000 && event.code !== 1008) {
           reconnectTimeout = setTimeout(connect, 3000);
         }
@@ -124,7 +160,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     return () => {
       if (reconnectTimeout) clearTimeout(reconnectTimeout);
       if (ws) {
-        ws.onclose = null; // prevent reconnect on intentional close
+        ws.onclose = null;
         ws.close(1000);
       }
     };
@@ -134,10 +170,15 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   const markAsRead = (id: string) => {
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+    const notif = notifications.find(n => n.id === id);
+    if (notif?.db_id) {
+      notificationsApi.markRead(notif.db_id).catch(() => {});
+    }
   };
 
   const markAllAsRead = () => {
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    notificationsApi.markAllRead().catch(() => {});
   };
 
   const clearNotifications = () => {

@@ -266,6 +266,29 @@ export const claimsApi = {
     },
 };
 
+export interface PersistedNotification {
+    id: number;
+    type: string;
+    message: string;
+    claim_id: number | null;
+    extra_data: Record<string, any> | null;
+    read: boolean;
+    created_at: string;
+}
+
+export const notificationsApi = {
+    list: async (): Promise<PersistedNotification[]> => {
+        const { data } = await api.get('/api/v1/notifications/');
+        return data;
+    },
+    markRead: async (id: number): Promise<void> => {
+        await api.patch(`/api/v1/notifications/${id}/read`);
+    },
+    markAllRead: async (): Promise<void> => {
+        await api.patch('/api/v1/notifications/read-all');
+    },
+};
+
 export const authApi = {
     forgotPassword: async (username: string): Promise<{ message: string; reset_token?: string }> => {
         const { data } = await api.post('/auth/forgot-password', { username });

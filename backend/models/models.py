@@ -3,7 +3,7 @@ import json
 from datetime import datetime, timezone
 
 from sqlalchemy import (
-    Column, Integer, String, Text, Float, DateTime,
+    Column, Integer, String, Text, Float, DateTime, Boolean,
     ForeignKey, Enum as SAEnum, JSON
 )
 from sqlalchemy.orm import relationship
@@ -62,6 +62,8 @@ class User(Base):
     hashed_password = Column(String(255), nullable=False)
     role = Column(SAEnum(UserRole), nullable=False)
 
+    notifications = relationship("Notification", back_populates="user", cascade="all, delete-orphan")
+
 
 class PasswordResetToken(Base):
     """Database model representing a password reset token for a user."""
@@ -109,6 +111,8 @@ class Claim(Base):
         "FraudAlert", back_populates="claim", cascade="all, delete-orphan")
     document_summaries = relationship(
         "DocumentSummary", back_populates="claim", cascade="all, delete-orphan")
+    notifications = relationship(
+        "Notification", back_populates="claim", cascade="all, delete-orphan")
 
 
 class Document(Base):
@@ -217,6 +221,23 @@ class HospitalProfile(Base):
     is_flagged = Column(Integer, default=0)
     is_ayush_registered = Column(Integer, default=0)
     created_at = Column(DateTime, default=utcnow, nullable=False)
+
+
+class Notification(Base):
+    """Persistent notifications for hospital and insurer users."""
+    __tablename__ = "notifications"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    type = Column(String(50), nullable=False)
+    message = Column(Text, nullable=False)
+    claim_id = Column(Integer, ForeignKey("claims.id"), nullable=True)
+    extra_data = Column(JSON, nullable=True)
+    read = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime, default=utcnow, nullable=False)
+
+    user = relationship("User", back_populates="notifications")
+    claim = relationship("Claim", back_populates="notifications")
 
 
 class DoctorProfile(Base):
