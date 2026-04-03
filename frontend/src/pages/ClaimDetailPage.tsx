@@ -76,6 +76,7 @@ export default function ClaimDetailPage() {
     const [reviewDecision, setReviewDecision] = useState<'APPROVED' | 'REJECTED' | 'INFO_REQUESTED'>('APPROVED');
     const [reviewComments, setReviewComments] = useState('');
     const [submittingReview, setSubmittingReview] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
 
     const fetchData = useCallback(async () => {
         if (!id) return;
@@ -88,6 +89,12 @@ export default function ClaimDetailPage() {
             setLoading(false);
         }
     }, [id]);
+
+    const handleRefresh = useCallback(async () => {
+        setRefreshing(true);
+        await fetchData();
+        setRefreshing(false);
+    }, [fetchData]);
 
     useEffect(() => {
         fetchData();
@@ -388,14 +395,14 @@ export default function ClaimDetailPage() {
 
             {/* Missing Policy Banner */}
             {user?.role === 'HOSPITAL' && data.claim.status === 'EXTRACTED' && (
-                <div className="card" style={{ marginBottom: '24px', padding: '24px', border: '2px solid var(--warning)', background: '#fffbeb' }}>
+                <div className="card" style={{ marginBottom: '24px', padding: '24px', border: '2px solid var(--warning)', background: 'var(--warning-bg)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
                         <AlertTriangle size={24} style={{ color: 'var(--warning)' }} />
-                        <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 600, color: '#854d0e' }}>
+                        <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 600, color: 'var(--warning)' }}>
                             Missing Information Required
                         </h3>
                     </div>
-                    <p style={{ margin: '0 0 20px 0', fontSize: '0.9rem', color: '#92400e' }}>
+                    <p style={{ margin: '0 0 20px 0', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
                         The automated extraction pipeline completed successfully, but some mandatory information is missing. Please provide the details below to proceed to automated validation.
                     </p>
                     
@@ -407,13 +414,13 @@ export default function ClaimDetailPage() {
 
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px', alignItems: 'flex-end' }}>
                         <div style={{ flex: 1, minWidth: '250px' }}>
-                            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#92400e', marginBottom: '6px' }}>
+                            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--warning)', marginBottom: '6px' }}>
                                 Insurer <span style={{ color: 'var(--error)' }}>*</span>
                             </label>
                             <select
                                 value={selectedInsurerId}
                                 onChange={(e) => setSelectedInsurerId(e.target.value)}
-                                style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #d1d5db', backgroundColor: 'white' }}
+                                style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-card)', color: 'var(--text-primary)' }}
                                 disabled={linkLoading}
                             >
                                 <option value="">-- Select Insurer --</option>
@@ -424,7 +431,7 @@ export default function ClaimDetailPage() {
                         </div>
                         {missingPolicyNumber && (
                             <div style={{ flex: 1, minWidth: '250px' }}>
-                                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#92400e', marginBottom: '6px' }}>
+                                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--warning)', marginBottom: '6px' }}>
                                     Policy Number <span style={{ color: 'var(--error)' }}>*</span>
                                 </label>
                                 <input
@@ -432,7 +439,7 @@ export default function ClaimDetailPage() {
                                     value={enteredPolicyNumber}
                                     onChange={(e) => setEnteredPolicyNumber(e.target.value)}
                                     placeholder="Enter policy number..."
-                                    style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #d1d5db', backgroundColor: 'white' }}
+                                    style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-card)', color: 'var(--text-primary)' }}
                                     disabled={linkLoading}
                                 />
                             </div>
@@ -440,7 +447,7 @@ export default function ClaimDetailPage() {
                         
                         {missingDiagnosis && (
                             <div style={{ flex: 1, minWidth: '250px' }}>
-                                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#92400e', marginBottom: '6px' }}>
+                                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--warning)', marginBottom: '6px' }}>
                                     Diagnosis <span style={{ color: 'var(--error)' }}>*</span>
                                 </label>
                                 <input
@@ -448,7 +455,7 @@ export default function ClaimDetailPage() {
                                     value={enteredDiagnosis}
                                     onChange={(e) => setEnteredDiagnosis(e.target.value)}
                                     placeholder="Enter diagnosis..."
-                                    style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #d1d5db', backgroundColor: 'white' }}
+                                    style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-card)', color: 'var(--text-primary)' }}
                                     disabled={linkLoading}
                                 />
                             </div>
@@ -456,7 +463,7 @@ export default function ClaimDetailPage() {
 
                         {missingIcdCode && (
                             <div style={{ flex: 1, minWidth: '250px' }}>
-                                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#92400e', marginBottom: '6px' }}>
+                                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--warning)', marginBottom: '6px' }}>
                                     ICD-10 Code <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: '0.78rem' }}>(optional)</span>
                                 </label>
                                 <input
@@ -464,7 +471,7 @@ export default function ClaimDetailPage() {
                                     value={enteredIcdCode}
                                     onChange={(e) => setEnteredIcdCode(e.target.value)}
                                     placeholder="e.g. A01.0"
-                                    style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #d1d5db', backgroundColor: 'white' }}
+                                    style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-card)', color: 'var(--text-primary)' }}
                                     disabled={linkLoading}
                                 />
                             </div>
@@ -472,7 +479,7 @@ export default function ClaimDetailPage() {
 
                         {missingBillAmount && (
                             <div style={{ flex: 1, minWidth: '250px' }}>
-                                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#92400e', marginBottom: '6px' }}>
+                                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--warning)', marginBottom: '6px' }}>
                                     Total Bill Amount <span style={{ color: 'var(--error)' }}>*</span>
                                 </label>
                                 <input
@@ -480,7 +487,7 @@ export default function ClaimDetailPage() {
                                     value={enteredBillAmount}
                                     onChange={(e) => setEnteredBillAmount(e.target.value)}
                                     placeholder="e.g. ₹55,000"
-                                    style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #d1d5db', backgroundColor: 'white' }}
+                                    style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-card)', color: 'var(--text-primary)' }}
                                     disabled={linkLoading}
                                 />
                             </div>
@@ -524,9 +531,9 @@ export default function ClaimDetailPage() {
 
             {/* Action buttons */}
             <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', flexWrap: 'wrap' }}>
-                <button className="btn btn-secondary" onClick={fetchData}>
-                    <RefreshCw size={15} />
-                    Refresh
+                <button className="btn btn-secondary" onClick={handleRefresh} disabled={refreshing}>
+                    <RefreshCw size={15} style={{ animation: refreshing ? 'spin 0.7s linear infinite' : 'none' }} />
+                    {refreshing ? 'Refreshing…' : 'Refresh'}
                 </button>
 
                 {user?.role === 'HOSPITAL' && (
@@ -680,23 +687,23 @@ export default function ClaimDetailPage() {
                 <div className="card animate-scale-in" style={{
                     marginBottom: '24px',
                     padding: '24px',
-                    background: 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 50%, #f0fdfa 100%)',
-                    border: '1px solid #bbf7d0',
+                    background: 'var(--success-bg)',
+                    border: '1px solid rgba(34,197,94,0.3)',
                     borderLeft: '4px solid #22c55e',
                 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
                         <div style={{
                             width: '36px', height: '36px', borderRadius: '10px',
-                            background: '#dcfce7', display: 'flex',
+                            background: 'rgba(34,197,94,0.15)', display: 'flex',
                             alignItems: 'center', justifyContent: 'center',
                         }}>
-                            <BookOpen size={18} style={{ color: '#16a34a' }} />
+                            <BookOpen size={18} style={{ color: 'var(--success)' }} />
                         </div>
                         <div>
-                            <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#15803d', margin: 0 }}>
+                            <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--success)', margin: 0 }}>
                                 Document Summary
                             </h3>
-                            <span style={{ fontSize: '0.72rem', color: '#4ade80' }}>
+                            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
                                 {data.summary.document_count} document{data.summary.document_count !== 1 ? 's' : ''} analyzed · {formatDate(data.summary.created_at)}
                             </span>
                         </div>
@@ -704,12 +711,12 @@ export default function ClaimDetailPage() {
 
                     <div style={{
                         padding: '16px 18px',
-                        background: 'rgba(255,255,255,0.7)', borderRadius: '8px',
+                        background: 'var(--bg-card)', borderRadius: '8px',
                         border: '1px solid rgba(34,197,94,0.15)',
                     }}>
                         {data.summary.summary_text.split('\n\n').map((paragraph, idx) => (
                             <p key={idx} style={{
-                                fontSize: '0.9rem', lineHeight: '1.7', color: '#1a1a2e',
+                                fontSize: '0.9rem', lineHeight: '1.7', color: 'var(--text-primary)',
                                 margin: idx === 0 ? '0 0 12px 0' : '12px 0',
                                 ...(idx === data.summary!.summary_text.split('\n\n').length - 1 ? { marginBottom: 0 } : {}),
                             }}>

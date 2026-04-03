@@ -418,7 +418,7 @@ a {
 }
 
 .btn-secondary {
-  background: #fff;
+  background: var(--bg-card);
   color: var(--text-primary);
   border: 1px solid var(--border);
 }
@@ -469,15 +469,15 @@ a {
 }
 
 .badge-pending {
-  background: #F1F5F9;
-  color: #64748B;
-  border: 1px solid #CBD5E1;
+  background: var(--border-subtle);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
 }
 
 .badge-processing {
-  background: #EFF6FF;
-  color: #3B82F6;
-  border: 1px solid #BFDBFE;
+  background: var(--info-bg);
+  color: var(--info);
+  border: 1px solid rgba(59,130,246,0.3);
 }
 
 .badge-extracted {
@@ -515,7 +515,7 @@ a {
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background: #3B82F6;
+  background: var(--info);
   animation: pulse 1.5s ease-in-out infinite;
 }
 

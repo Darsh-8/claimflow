@@ -73,19 +73,6 @@ export default function DashboardPage() {
 
     return (
         <div className="animate-fade-in">
-            {/* ── Refresh progress bar (shows on manual + auto refresh) ── */}
-            {refreshing && (
-                <div style={{
-                    position: 'fixed', top: 64, left: 240, right: 0, zIndex: 100, height: '3px',
-                    background: 'var(--border)',
-                }}>
-                    <div style={{
-                        height: '100%', background: 'var(--accent-blue)',
-                        animation: 'indeterminate 1.2s ease-in-out infinite',
-                        position: 'absolute', width: '40%',
-                    }} />
-                </div>
-            )}
 
             {/* ── Page header ── */}
             <div className="page-header">
@@ -109,10 +96,7 @@ export default function DashboardPage() {
                     >
                         <RefreshCw
                             size={15}
-                            style={refreshing
-                                ? { animation: 'spin 0.6s linear infinite', transformOrigin: 'center' }
-                                : { transition: 'transform 0.3s ease' }
-                            }
+                            style={{ animation: refreshing ? 'spin 0.7s linear infinite' : 'none' }}
                         />
                         {refreshing ? 'Refreshing…' : 'Refresh'}
                     </button>
@@ -129,8 +113,8 @@ export default function DashboardPage() {
                 <div className="stat-card">
                     <div className="stat-card-header">
                         <span className="stat-card-title">Total Claims</span>
-                        <div className="stat-card-icon" style={{ background: '#EFF6FF' }}>
-                            <FileStack size={18} style={{ color: '#3B82F6' }} />
+                        <div className="stat-card-icon" style={{ background: 'var(--info-bg)' }}>
+                            <FileStack size={18} style={{ color: 'var(--info)' }} />
                         </div>
                     </div>
                     <div className="stat-card-value">{total}</div>
@@ -156,8 +140,8 @@ export default function DashboardPage() {
                 <div className="stat-card">
                     <div className="stat-card-header">
                         <span className="stat-card-title">In Progress</span>
-                        <div className="stat-card-icon" style={{ background: '#EFF6FF' }}>
-                            <Loader2 size={18} style={{ color: '#3B82F6' }} />
+                        <div className="stat-card-icon" style={{ background: 'var(--info-bg)' }}>
+                            <Loader2 size={18} style={{ color: 'var(--info)' }} />
                         </div>
                     </div>
                     <div className="stat-card-value">{processing}</div>
@@ -168,8 +152,8 @@ export default function DashboardPage() {
                 <div className="stat-card">
                     <div className="stat-card-header">
                         <span className="stat-card-title">Validated</span>
-                        <div className="stat-card-icon" style={{ background: '#ECFDF5' }}>
-                            <CheckCircle2 size={18} style={{ color: '#10B981' }} />
+                        <div className="stat-card-icon" style={{ background: 'var(--success-bg)' }}>
+                            <CheckCircle2 size={18} style={{ color: 'var(--success)' }} />
                         </div>
                     </div>
                     <div className="stat-card-value">{validated}</div>
@@ -180,8 +164,8 @@ export default function DashboardPage() {
                 <div className="stat-card">
                     <div className="stat-card-header">
                         <span className="stat-card-title">Errors</span>
-                        <div className="stat-card-icon" style={{ background: '#FEF2F2' }}>
-                            <XCircle size={18} style={{ color: '#EF4444' }} />
+                        <div className="stat-card-icon" style={{ background: 'var(--error-bg)' }}>
+                            <XCircle size={18} style={{ color: 'var(--error)' }} />
                         </div>
                     </div>
                     <div className="stat-card-value">{errors}</div>
