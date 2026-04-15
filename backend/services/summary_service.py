@@ -144,7 +144,7 @@ async def generate_document_summary(
         return _build_fallback_summary(extracted_fields)
 
 
-def _build_fallback_summary(extracted_fields: dict) -> dict:
+def _build_fallback_summary(extracted_fields: dict, ocr_errors: list | None = None) -> dict:
     """
     Build a comprehensive, plain-English multi-paragraph summary from
     extracted structured fields. Written so anyone can understand it.
