@@ -65,12 +65,13 @@ async def generate_document_summary(
     Returns:
         A dict with 'summary_text' (str) and 'key_findings' (list[str]).
     """
+    ocr_errors = [t for t in raw_texts if t and t.startswith("[OCR ERROR")]
     combined_text = "\n\n---\n\n".join(
         t for t in raw_texts if t and not t.startswith("[OCR ERROR")
     )
 
     if not combined_text.strip():
-        return _build_fallback_summary(extracted_fields)
+        return _build_fallback_summary(extracted_fields, ocr_errors=ocr_errors)
 
     fields_context = json.dumps(extracted_fields, indent=2, default=str)
 
