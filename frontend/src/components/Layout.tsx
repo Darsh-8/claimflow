@@ -3,7 +3,7 @@ import { NavLink, Outlet, useSearchParams, useNavigate, useLocation } from 'reac
 import {
     LayoutDashboard, BarChart3, Upload, Activity, Search,
     LogOut, Settings, TrendingUp, Sun, Moon, ChevronDown,
-    Bell, ChevronLeft, ChevronRight, Plus, Menu,
+    Bell, Plus, Menu,
     Users, Stethoscope, BedDouble, ClipboardList, Calendar, Receipt, HeartPulse,
 } from 'lucide-react';
 import * as Tooltip from '@radix-ui/react-tooltip';

@@ -576,7 +576,6 @@ export default function PatientDetailPage() {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               {claims.map((claim: JourneyClaim) => {
-                const sc = CLAIM_STATUS[claim.status?.toLowerCase()] ?? { bg: 'var(--border)', color: 'var(--text-muted)' };
                 return (
                   <div key={claim.id} className="card">
                     {/* Claim header */}

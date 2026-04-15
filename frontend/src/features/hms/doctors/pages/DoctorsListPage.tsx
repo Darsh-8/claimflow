@@ -4,7 +4,7 @@ import { Plus, Search, Loader2, Stethoscope, Phone, Mail, X, Edit2, IndianRupee,
 import { toast } from 'sonner';
 import { useDoctors } from '../hooks/useDoctors';
 import { doctorsApi } from '../api/doctorsApi';
-import DoctorForm, { DEFAULT_DEPARTMENTS } from '../components/DoctorForm';
+import DoctorForm from '../components/DoctorForm';
 import type { Doctor, DoctorCreate } from '../../types';
 
 const DEPT_COLORS: Record<string, string> = {
