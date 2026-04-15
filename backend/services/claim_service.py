@@ -74,7 +74,7 @@ class ClaimService:
         return str(file_path)
 
     @staticmethod
-    async def upload_documents(background_tasks: BackgroundTasks, files: list[UploadFile], doc_types: list[str], insurer_id: Optional[int], db: Session, current_user: User) -> UploadResponse:
+    async def upload_documents(background_tasks: BackgroundTasks, files: list[UploadFile], doc_types: list[str], insurer_id: Optional[int], db: Session, current_user: User, patient_name: Optional[str] = None) -> UploadResponse:
         if len(files) != len(doc_types):
             raise HTTPException(400, "Number of files and doc_types must match")
 
@@ -82,7 +82,7 @@ class ClaimService:
         for dt in doc_types:
             if dt not in valid_types: raise HTTPException(400, f"Invalid doc_type: {dt}")
 
-        claim = ClaimRepository.create_claim(db, insurer_id, created_by=current_user.id)
+        claim = ClaimRepository.create_claim(db, insurer_id, created_by=current_user.id, patient_name=patient_name or None)
         docs_created = 0
 
         for file, doc_type in zip(files, doc_types):

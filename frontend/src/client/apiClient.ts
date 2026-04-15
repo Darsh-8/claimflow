@@ -166,10 +166,11 @@ export const usersApi = {
 
 // API methods
 export const claimsApi = {
-    upload: async (files: File[], docTypes: string[]): Promise<UploadResponse> => {
+    upload: async (files: File[], docTypes: string[], patientName?: string): Promise<UploadResponse> => {
         const formData = new FormData();
         files.forEach((file) => formData.append('files', file));
         docTypes.forEach((dt) => formData.append('doc_types', dt));
+        if (patientName) formData.append('patient_name', patientName);
         const { data } = await api.post('/claims/upload', formData, {
             headers: { 'Content-Type': 'multipart/form-data' },
         });

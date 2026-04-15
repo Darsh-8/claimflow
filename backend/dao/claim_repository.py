@@ -10,9 +10,9 @@ class ClaimRepository:
     """ORM Repository for coordinating Claim-related database interactions."""
 
     @staticmethod
-    def create_claim(db: Session, insurer_id: Optional[int] = None, created_by: Optional[int] = None) -> Claim:
+    def create_claim(db: Session, insurer_id: Optional[int] = None, created_by: Optional[int] = None, patient_name: Optional[str] = None) -> Claim:
         """Create a new empty claim with PENDING status."""
-        claim = Claim(status=ClaimStatus.PENDING, insurer_id=insurer_id, created_by=created_by)
+        claim = Claim(status=ClaimStatus.PENDING, insurer_id=insurer_id, created_by=created_by, patient_name=patient_name)
         db.add(claim)
         db.commit()
         db.refresh(claim)
