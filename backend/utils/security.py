@@ -6,8 +6,8 @@ from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 
-from db.database import get_db
-from model.models import User, UserRole
+from config.database import get_db
+from models.models import User, UserRole
 
 # Config
 SECRET_KEY = "super-secret-claimflow-key-for-dev-only"  # In prod, load from .env

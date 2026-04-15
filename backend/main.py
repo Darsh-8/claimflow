@@ -1,17 +1,19 @@
-import logging
 from contextlib import asynccontextmanager
+
+from logger import get_app_logger
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from db.database import engine, Base, SessionLocal
-from api.routes import claims as claims_router
-from api.routes import auth as auth_router
-from api.routes import users as users_router
-from api.routes import notifications as notifications_router
+from config.database import engine, Base, SessionLocal
+from routes import claims as claims_router
+from routes import auth as auth_router
+from routes import users as users_router
+from routes import notifications as notifications_router
+from middleware.logging_middleware import RequestLoggingMiddleware
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# Bootstrap the application logger (singleton — safe to call multiple times)
+logger = get_app_logger()
 
 
 @asynccontextmanager
@@ -21,7 +23,7 @@ async def lifespan(app: FastAPI):
     logger.info("Database tables created")
 
     # Seed Test Users
-    from db.seed import seed_demo_accounts
+    from config.seed import seed_demo_accounts
     seed_demo_accounts()
 
     yield
@@ -35,7 +37,10 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS — allow frontend dev server
+# Add request logging middleware
+app.add_middleware(RequestLoggingMiddleware)
+
+# CORS — allow frontend dev server (MUST be added last so it's the outermost middleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[

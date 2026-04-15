@@ -191,6 +191,9 @@ cp backend/.env.example backend/.env
 | `POST` | `/auth/login` | Login and receive JWT cookies |
 | `POST` | `/auth/refresh` | Refresh access token |
 | `POST` | `/auth/logout` | Clear auth cookies |
+| `POST` | `/auth/forgot-password` | Request password reset token |
+| `POST` | `/auth/reset-password` | Reset password using the token |
+| `POST` | `/auth/update-password` | Update current authenticated user's password |
 
 ### Claims (`/claims`)
 
@@ -198,12 +201,31 @@ cp backend/.env.example backend/.env
 |---|---|---|---|
 | `POST` | `/claims/upload` | Upload documents and create a claim | Hospital |
 | `GET` | `/claims/` | List all claims (paginated) | Any |
-| `GET` | `/claims/{id}/status` | Get claim processing status | Any |
-| `GET` | `/claims/{id}/data` | Get full claim data (fields, validation, alerts) | Any |
-| `POST` | `/claims/{id}/validate` | Re-run validation pipeline | Hospital, Insurer |
-| `PUT` | `/claims/{id}/corrections` | Submit field corrections | Hospital |
-| `POST` | `/claims/{id}/documents` | Upload additional documents | Hospital |
-| `POST` | `/claims/{id}/review` | Submit approval/rejection decision | Insurer |
+| `GET` | `/claims/dashboard/analytics` | Get global system performance metrics | Any |
+| `GET` | `/claims/dashboard/role-analytics`| Get metrics tailored to user role | Any |
+| `POST` | `/claims/{claim_id}/link-policy` | Link existing policy data to claim | Any |
+| `GET` | `/claims/{claim_id}/summary` | AI-generated summary of all claim docs | Any |
+| `GET` | `/claims/{claim_id}/status` | Get claim processing status | Any |
+| `GET` | `/claims/{claim_id}/data` | Get full claim data (fields, validation, alerts) | Any |
+| `POST` | `/claims/{claim_id}/validate` | Re-run validation pipeline | Hospital, Insurer |
+| `PUT` | `/claims/{claim_id}/correct` | Submit field corrections | Hospital |
+| `POST` | `/claims/{claim_id}/upload-additional`| Upload additional documents | Hospital |
+| `POST` | `/claims/{claim_id}/review` | Submit approval/rejection decision | Insurer |
+| `GET` | `/claims/{claim_id}/documents/{doc_id}/download`| Securely download a claim document file | Hospital, Insurer |
+| `GET` | `/claims/{claim_id}/patient-history`| Get previous claim profile history for patient | Any |
+| `GET` | `/claims/{claim_id}/comprehend` | Extract medical relationships via AWS Bedrock | Hospital, Insurer |
+
+### Users (`/users`)
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/users/insurers` | Fetch list of users with INSURER role | Any |
+
+### Notifications (`/api/v1/notifications`)
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `WS` | `/api/v1/notifications/ws` | Live WebSocket endpoint for async events | Any |
 
 ### Health
 

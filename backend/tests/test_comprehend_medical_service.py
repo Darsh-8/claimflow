@@ -8,7 +8,7 @@ import asyncio
 import unittest
 from unittest.mock import MagicMock, patch
 
-from service.comprehend_medical_service import (
+from services.comprehend_medical_service import (
     run_comprehend_medical,
     get_top_icd10_codes,
     _infer_icd10_cm_sync,
