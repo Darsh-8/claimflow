@@ -25,10 +25,11 @@ async def upload_documents(
     files: list[UploadFile] = File(...),
     doc_types: list[str] = Form(...),
     insurer_id: Optional[int] = Form(None),
+    patient_name: Optional[str] = Form(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role([UserRole.HOSPITAL])),
 ):
-    return await ClaimService.upload_documents(background_tasks, files, doc_types, insurer_id, db, current_user)
+    return await ClaimService.upload_documents(background_tasks, files, doc_types, insurer_id, db, current_user, patient_name=patient_name)
 
 @router.get("", response_model=list[ClaimListItem])
 def list_claims(
