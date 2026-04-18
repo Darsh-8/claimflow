@@ -4,7 +4,7 @@ import {
     LayoutDashboard, BarChart3, Upload, Activity, Search,
     LogOut, Settings, TrendingUp, Sun, Moon, ChevronDown,
     Bell, Plus, Menu,
-    Users, Stethoscope, BedDouble, ClipboardList, Calendar, Receipt, HeartPulse,
+    Users, Stethoscope, BedDouble, ClipboardList, Calendar, Receipt, HeartPulse, ShieldCheck
 } from 'lucide-react';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { useAuth } from '../context/AuthContext';
@@ -251,7 +251,9 @@ export default function Layout() {
 
                 {/* ──── Nav scrollable area ──── */}
                 <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', paddingTop: '8px' }}>
-                    {/* Quick action CTA at the top */}
+                    {user?.role !== 'ADMIN' && (
+                        <>
+                            {/* Quick action CTA at the top */}
                     <div style={{ padding: '8px 12px 12px' }}>
                         {user?.role === 'HOSPITAL' ? (
                             <NavItem to="/upload" icon={<Upload size={18} />} label="New Claim" collapsed={isCollapsed} accent />
@@ -260,13 +262,15 @@ export default function Layout() {
                         )}
                     </div>
 
-                    <nav className="sidebar-nav">
-                        <NavItem to="/" icon={<LayoutDashboard size={18} />} label="Overview" collapsed={isCollapsed} end />
-                        {user?.role === 'HOSPITAL' && (
-                            <NavItem to="/analytics" icon={<BarChart3 size={18} />} label="Performance" collapsed={isCollapsed} />
-                        )}
-                        <NavItem to="/role-analytics" icon={<TrendingUp size={18} />} label="Analytics" collapsed={isCollapsed} />
-                    </nav>
+                            <nav className="sidebar-nav">
+                                <NavItem to="/" icon={<LayoutDashboard size={18} />} label="Overview" collapsed={isCollapsed} end />
+                                {user?.role === 'HOSPITAL' && (
+                                    <NavItem to="/analytics" icon={<BarChart3 size={18} />} label="Performance" collapsed={isCollapsed} />
+                                )}
+                                <NavItem to="/role-analytics" icon={<TrendingUp size={18} />} label="Analytics" collapsed={isCollapsed} />
+                            </nav>
+                        </>
+                    )}
 
                     {user?.role === 'HOSPITAL' && (
                         <>
@@ -283,6 +287,14 @@ export default function Layout() {
                         </>
                     )}
 
+                    {user?.role === 'ADMIN' && (
+                        <>
+                            <SidebarSection label="System" collapsed={isCollapsed} />
+                            <nav className="sidebar-nav">
+                                <NavItem to="/admin" icon={<ShieldCheck size={18} />} label="Admin Panel" collapsed={isCollapsed} />
+                            </nav>
+                        </>
+                    )}
 
                 </div>
 
@@ -342,6 +354,7 @@ export default function Layout() {
                         Hello, {user?.username} 👋
                     </div>
                     <div style={{ padding: 0, background: 'transparent', border: 'none', minWidth: 280 }}>
+                        {user?.role !== 'ADMIN' && (
                         <div style={{
                             display: 'flex', alignItems: 'center', gap: '8px',
                             background: 'var(--bg-page)', border: '1px solid var(--border)',
@@ -366,6 +379,7 @@ export default function Layout() {
                                 >✕</button>
                             )}
                         </div>
+                        )}
                     </div>
 
                     <div className="topbar-actions" style={{ display: 'flex', alignItems: 'center', gap: '20px', position: 'relative' }}>

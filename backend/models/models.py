@@ -25,6 +25,7 @@ class ClaimStatus(str, enum.Enum):
 class UserRole(str, enum.Enum):
     HOSPITAL = "HOSPITAL"
     INSURER = "INSURER"
+    ADMIN = "ADMIN"
 
 
 class DocumentType(str, enum.Enum):
@@ -144,8 +145,7 @@ class ExtractedField(Base):
     field_name = Column(String(100), nullable=False)
     field_value = Column(Text, nullable=True)
     confidence = Column(Float, nullable=True)
-    # SQLite doesn't have native bool
-    is_manually_corrected = Column(Integer, default=0)
+    is_manually_corrected = Column(Boolean, default=False)
 
     claim = relationship("Claim", back_populates="extracted_fields")
 
@@ -188,7 +188,7 @@ class FraudAlert(Base):
     rule_triggered = Column(String(255), nullable=False)
     risk_score = Column(Integer, nullable=False)
     details = Column(JSON, nullable=True)
-    reviewed = Column(Integer, default=0)
+    reviewed = Column(Boolean, default=False)
     reviewer_notes = Column(Text, nullable=True)
     created_at = Column(DateTime, default=utcnow, nullable=False)
 
@@ -218,8 +218,8 @@ class HospitalProfile(Base):
                            index=True, nullable=False)
     total_claims = Column(Integer, default=0)
     average_claim_amount = Column(Float, default=0.0)
-    is_flagged = Column(Integer, default=0)
-    is_ayush_registered = Column(Integer, default=0)
+    is_flagged = Column(Boolean, default=False)
+    is_ayush_registered = Column(Boolean, default=False)
     created_at = Column(DateTime, default=utcnow, nullable=False)
 
 

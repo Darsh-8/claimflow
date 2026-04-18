@@ -10,6 +10,7 @@ import ClaimDetailPage from './pages/ClaimDetailPage';
 import LoginPage from './pages/LoginPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
+import AdminPage from './pages/AdminPage';
 import { useAuth } from './context/AuthContext';
 
 // HMS pages
@@ -22,15 +23,24 @@ import AppointmentsListPage from './features/hms/appointments/pages/Appointments
 import BillingListPage from './features/hms/billing/pages/BillingListPage';
 import HMSAnalyticsPage from './features/hms/analytics/HMSAnalyticsPage';
 
-const PrivateRoute = () => {
-  const { isAuthenticated } = useAuth();
-  return isAuthenticated ? <Outlet /> : <Navigate to="/login" replace />;
+const ClaimFlowRoute = () => {
+  const { isAuthenticated, user } = useAuth();
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (user?.role === 'ADMIN') return <Navigate to="/admin" replace />;
+  return <Outlet />;
 };
 
 const HospitalRoute = () => {
   const { isAuthenticated, user } = useAuth();
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   if (user?.role !== 'HOSPITAL') return <Navigate to="/" replace />;
+  return <Outlet />;
+};
+
+const AdminRoute = () => {
+  const { isAuthenticated, user } = useAuth();
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (user?.role !== 'ADMIN') return <Navigate to="/" replace />;
   return <Outlet />;
 };
 
@@ -43,8 +53,8 @@ export default function App() {
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
 
-        {/* Protected Routes */}
-        <Route element={<PrivateRoute />}>
+        {/* Protected Routes (Hospital & Insurer) */}
+        <Route element={<ClaimFlowRoute />}>
           <Route element={<Layout />}>
             <Route path="/" element={<DashboardPage />} />
             <Route path="/analytics" element={<PerformanceDashboardPage />} />
@@ -66,6 +76,13 @@ export default function App() {
             <Route path="/hms/admissions" element={<AdmissionsListPage />} />
             <Route path="/hms/appointments" element={<AppointmentsListPage />} />
             <Route path="/hms/billing" element={<BillingListPage />} />
+          </Route>
+        </Route>
+
+        {/* Admin only */}
+        <Route element={<AdminRoute />}>
+          <Route element={<Layout />}>
+            <Route path="/admin" element={<AdminPage />} />
           </Route>
         </Route>
       </Routes>

@@ -157,6 +157,12 @@ export interface UserResponse {
     role: string;
 }
 
+export interface ICD10SuggestItem {
+    code: string;
+    description: string;
+    score: number;
+}
+
 export const usersApi = {
     getInsurers: async (): Promise<UserResponse[]> => {
         const { data } = await api.get('/users/insurers');
@@ -264,6 +270,11 @@ export const claimsApi = {
         
         const { data } = await api.post(`/claims/${id}/link-policy`, payload);
         return data;
+    },
+
+    suggestICD10: async (text: string): Promise<ICD10SuggestItem[]> => {
+        const { data } = await api.post('/claims/suggest-icd10', { text });
+        return data.suggestions ?? [];
     },
 };
 
@@ -394,6 +405,41 @@ export const analyticsApi = {
     },
     getRoleAnalytics: async (): Promise<RoleAnalyticsResponse> => {
         const { data } = await api.get('/claims/dashboard/role-analytics');
+        return data;
+    }
+};
+
+export interface AdminStatsResponse {
+    users: { total: number; hospitals: number; insurers: number; admins: number };
+    claims: { total: number; processing: number };
+}
+
+export interface AdminUserResponse {
+    id: number;
+    username: string;
+    role: string;
+    claim_count: number;
+}
+
+export const adminApi = {
+    getStats: async (): Promise<AdminStatsResponse> => {
+        const { data } = await api.get('/admin/stats');
+        return data;
+    },
+    getUsers: async (): Promise<AdminUserResponse[]> => {
+        const { data } = await api.get('/admin/users');
+        return data;
+    },
+    createUser: async (payload: any): Promise<any> => {
+        const { data } = await api.post('/admin/users', payload);
+        return data;
+    },
+    deleteUser: async (id: number): Promise<any> => {
+        const { data } = await api.delete(`/admin/users/${id}`);
+        return data;
+    },
+    resetPassword: async (id: number, payload: any): Promise<any> => {
+        const { data } = await api.patch(`/admin/users/${id}/password`, payload);
         return data;
     }
 };

@@ -9,7 +9,7 @@ import FieldEditor from '../components/FieldEditor';
 import ValidationCard from '../components/ValidationCard';
 import FileDropzone from '../components/FileDropzone';
 import ICD10Card from '../components/ICD10Card';
-import { claimsApi, type ClaimDataResponse, type PatientHistoryResponse, type ComprehendICD10Entity, type UserResponse } from '../client/apiClient';
+import { claimsApi, type ClaimDataResponse, type PatientHistoryResponse, type ComprehendICD10Entity, type UserResponse, type ICD10SuggestItem } from '../client/apiClient';
 import { useAuth } from '../context/AuthContext';
 
 const DOC_TYPE_LABELS: Record<string, string> = {
@@ -71,6 +71,10 @@ export default function ClaimDetailPage() {
     
     const [linkError, setLinkError] = useState('');
     const [linkLoading, setLinkLoading] = useState(false);
+
+    // ICD-10 live suggestions state
+    const [icdSuggestions, setIcdSuggestions] = useState<ICD10SuggestItem[]>([]);
+    const [icdSuggestLoading, setIcdSuggestLoading] = useState(false);
 
     // Review State
     const [reviewDecision, setReviewDecision] = useState<'APPROVED' | 'REJECTED' | 'INFO_REQUESTED'>('APPROVED');
@@ -450,14 +454,65 @@ export default function ClaimDetailPage() {
                                 <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--warning)', marginBottom: '6px' }}>
                                     Diagnosis <span style={{ color: 'var(--error)' }}>*</span>
                                 </label>
-                                <input
-                                    type="text"
-                                    value={enteredDiagnosis}
-                                    onChange={(e) => setEnteredDiagnosis(e.target.value)}
-                                    placeholder="Enter diagnosis..."
-                                    style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-card)', color: 'var(--text-primary)' }}
-                                    disabled={linkLoading}
-                                />
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                    <input
+                                        type="text"
+                                        value={enteredDiagnosis}
+                                        onChange={(e) => { setEnteredDiagnosis(e.target.value); setIcdSuggestions([]); }}
+                                        placeholder="Enter diagnosis..."
+                                        style={{ flex: 1, padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border)', backgroundColor: 'var(--bg-card)', color: 'var(--text-primary)' }}
+                                        disabled={linkLoading}
+                                    />
+                                    {enteredDiagnosis.trim().length > 3 && (
+                                        <button
+                                            type="button"
+                                            disabled={icdSuggestLoading}
+                                            onClick={async () => {
+                                                setIcdSuggestLoading(true);
+                                                try {
+                                                    const suggestions = await claimsApi.suggestICD10(enteredDiagnosis);
+                                                    setIcdSuggestions(suggestions);
+                                                    // Auto-fill ICD field with top suggestion if empty
+                                                    if (suggestions.length > 0 && !enteredIcdCode) {
+                                                        setEnteredIcdCode(suggestions[0].code);
+                                                    }
+                                                } catch { /* silent */ } finally {
+                                                    setIcdSuggestLoading(false);
+                                                }
+                                            }}
+                                            style={{
+                                                padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border)',
+                                                background: 'var(--accent-blue)', color: '#fff', cursor: 'pointer',
+                                                fontSize: '0.78rem', fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0
+                                            }}
+                                        >
+                                            {icdSuggestLoading ? '…' : '🔬 Suggest ICD-10'}
+                                        </button>
+                                    )}
+                                </div>
+                                {/* ICD suggestion chips */}
+                                {icdSuggestions.length > 0 && (
+                                    <div style={{ marginTop: '8px', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', alignSelf: 'center' }}>Suggestions:</span>
+                                        {icdSuggestions.map(s => (
+                                            <button
+                                                key={s.code}
+                                                type="button"
+                                                title={s.description}
+                                                onClick={() => setEnteredIcdCode(s.code)}
+                                                style={{
+                                                    padding: '3px 10px', borderRadius: '100px',
+                                                    border: enteredIcdCode === s.code ? '1.5px solid var(--accent-blue)' : '1px solid var(--border)',
+                                                    background: enteredIcdCode === s.code ? 'var(--accent-light)' : 'var(--bg-card)',
+                                                    color: enteredIcdCode === s.code ? 'var(--accent-blue)' : 'var(--text-secondary)',
+                                                    cursor: 'pointer', fontSize: '0.78rem', fontWeight: 700, fontFamily: 'monospace'
+                                                }}
+                                            >
+                                                {s.code}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         )}
 

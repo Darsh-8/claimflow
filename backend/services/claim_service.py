@@ -15,7 +15,7 @@ from config.database import SessionLocal
 from config.config import settings
 from dao.claim_repository import ClaimRepository
 from services.pipeline import run_extraction_pipeline, run_validation_pipeline, validate_claim
-from services.comprehend_medical_service import get_top_icd10_codes
+from services.comprehend_medical_service import get_top_icd10_codes, get_top_icd10_for_text
 
 from models.models import (
     Claim, Document, ExtractedField, ValidationResult, AuditLog, FraudAlert,
@@ -118,7 +118,17 @@ class ClaimService:
 
         _upsert_field("policy", "policy.policy_number", payload.policy_number)
         if payload.diagnosis: _upsert_field("clinical", "clinical.diagnosis", payload.diagnosis)
-        if payload.icd_code: _upsert_field("clinical", "clinical.icd_code", payload.icd_code)
+        
+        # Auto-derive ICD-10 code from diagnosis text using Comprehend Medical
+        # if the hospital didn't supply one manually
+        icd_to_save = payload.icd_code
+        if payload.diagnosis and not payload.icd_code:
+            auto_code = get_top_icd10_for_text(payload.diagnosis)
+            if auto_code:
+                icd_to_save = auto_code
+                logger.info(f"Auto-derived ICD-10 code '{auto_code}' for claim {claim.id} from diagnosis: '{payload.diagnosis}'")
+        
+        if icd_to_save: _upsert_field("clinical", "clinical.icd_code", icd_to_save)
         if payload.bill_amount: _upsert_field("financial", "financial.bill_amount", payload.bill_amount)
             
         db.commit()
@@ -232,7 +242,7 @@ class ClaimService:
             if not field: continue
             old_value = field.field_value
             field.field_value = corr.new_value
-            field.is_manually_corrected = 1
+            field.is_manually_corrected = True
             field.confidence = 1.0
             corrected.append({"field_id": corr.field_id, "field_name": field.field_name, "old_value": old_value, "new_value": corr.new_value})
         ClaimRepository.create_audit_log(db, claim.id, "CORRECT", {"corrections": corrected})
@@ -301,7 +311,17 @@ class ClaimService:
     @staticmethod
     def get_patient_history(claim: Claim, db: Session) -> PatientHistoryResponse:
         if not claim.policy_number: raise HTTPException(404, "No policy number available to look up history")
-        all_claims = db.query(Claim).filter(Claim.policy_number == claim.policy_number, Claim.id != claim.id).order_by(Claim.created_at.desc()).all()
+        
+        # Exclude draft/unsubmitted claims — EXTRACTED means the hospital hasn't
+        # confirmed and submitted the claim yet (no insurer linked, no validation run).
+        # PENDING and PROCESSING are mid-pipeline and also not yet real claims.
+        DRAFT_STATUSES = {'EXTRACTED', 'PENDING', 'PROCESSING'}
+        
+        all_claims = db.query(Claim).filter(
+            Claim.policy_number == claim.policy_number,
+            Claim.id != claim.id,
+            ~Claim.status.in_(list(DRAFT_STATUSES)),
+        ).order_by(Claim.created_at.desc()).all()
         history_claims = []
         for c in all_claims:
             diagnosis, total_amount, hospital_name = None, None, None

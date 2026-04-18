@@ -9,7 +9,7 @@ from schemas.schemas import (
     ValidationResponse, UploadResponse, CorrectionRequest,
     ClaimReviewRequest, DocumentSummaryResponse, ClaimAnalyticsResponse,
     PatientHistoryResponse, RoleAnalyticsResponse, ComprehendICD10Response,
-    PolicyLinkRequest
+    PolicyLinkRequest, ICD10SuggestRequest, ICD10SuggestResponse, ICD10SuggestItem
 )
 from utils.security import get_current_active_user, require_role
 from middleware.dependencies import get_claim_or_404
@@ -47,6 +47,21 @@ def get_analytics(db: Session = Depends(get_db), current_user: User = Depends(ge
 @router.get("/dashboard/role-analytics", response_model=RoleAnalyticsResponse)
 def get_role_analytics(db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
     return AnalyticsService.get_role_analytics(db, current_user)
+
+# -------- ICD-10 SUGGESTION (no claim ID needed) -------- #
+
+@router.post("/suggest-icd10", response_model=ICD10SuggestResponse)
+def suggest_icd10(
+    body: ICD10SuggestRequest,
+    current_user: User = Depends(get_current_active_user),
+):
+    """Return ICD-10 code suggestions for a freeform text string (e.g. a manually typed diagnosis)."""
+    from services.comprehend_medical_service import get_suggestions_for_text
+    raw = get_suggestions_for_text(body.text, max_codes=5)
+    return ICD10SuggestResponse(
+        suggestions=[ICD10SuggestItem(**s) for s in raw]
+    )
+
 
 # -------- DEPENDENCY INJECTED ROUTES BELOW -------- #
 

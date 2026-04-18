@@ -170,3 +170,54 @@ def get_top_icd10_codes(entities: list[dict], max_codes: int = 5) -> list[str]:
         if len(codes) >= max_codes:
             break
     return codes
+
+
+def get_top_icd10_for_text(text: str) -> Optional[str]:
+    """
+    Run Comprehend Medical synchronously on a short text string (e.g. a manually
+    entered diagnosis) and return the single highest-scoring ICD-10 code.
+    Returns None if Comprehend is unavailable or no codes are detected.
+    Gracefully swallows all errors so it never breaks the claim flow.
+    """
+    if not text or not text.strip():
+        return None
+    try:
+        entities = _infer_icd10_cm_sync(text)
+        codes = get_top_icd10_codes(entities, max_codes=1)
+        return codes[0] if codes else None
+    except Exception as exc:
+        logger.warning(f"get_top_icd10_for_text failed: {exc}")
+        return None
+
+
+def get_suggestions_for_text(text: str, max_codes: int = 5) -> list[dict]:
+    """
+    Return a list of ICD-10 suggestion dicts for a freeform text string.
+    Each dict has: { code, description, score }.
+    Used by the /claims/suggest-icd10 endpoint for live frontend chips.
+    Returns empty list on any failure.
+    """
+    if not text or not text.strip():
+        return []
+    try:
+        entities = _infer_icd10_cm_sync(text)
+        seen = set()
+        results = []
+        for entity in entities:
+            if "NEGATION" in entity.get("traits", []):
+                continue
+            code = entity.get("icd10_code")
+            if code and code not in seen:
+                seen.add(code)
+                results.append({
+                    "code": code,
+                    "description": entity.get("description") or entity.get("text", ""),
+                    "score": entity.get("icd10_score", 0.0),
+                })
+            if len(results) >= max_codes:
+                break
+        return results
+    except Exception as exc:
+        logger.warning(f"get_suggestions_for_text failed: {exc}")
+        return []
+
