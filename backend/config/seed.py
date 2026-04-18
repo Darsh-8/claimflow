@@ -13,6 +13,7 @@ def seed_demo_accounts():
             {"username": "demo_hospital_2", "password": "password123", "role": UserRole.HOSPITAL},
             {"username": "demo_insurer", "password": "password123", "role": UserRole.INSURER},
             {"username": "demo_insurer_2", "password": "password123", "role": UserRole.INSURER},
+            {"username": "admin", "password": "admin123", "role": UserRole.ADMIN},
         ]
 
         added_any = False

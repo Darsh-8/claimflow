@@ -361,7 +361,7 @@ export default function PatientDetailPage() {
       {/* ── Overview Tab ─────────────────────────────────────────────────────── */}
       {activeTab === 'overview' && (
         <div style={{ display: 'grid', gap: '16px' }}>
-          <div className="card">
+          <div className="card" style={{ padding: '24px' }}>
             <h2 style={{ margin: '0 0 18px', fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)' }}>Personal Information</h2>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '18px' }}>
               <Field label="Age" value={patient.age ? `${patient.age} years` : undefined} />
@@ -373,7 +373,7 @@ export default function PatientDetailPage() {
             </div>
             {patient.address && <div style={{ marginTop: '16px' }}><Field label="Address" value={patient.address} /></div>}
           </div>
-          <div className="card">
+          <div className="card" style={{ padding: '24px' }}>
             <h2 style={{ margin: '0 0 18px', fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)' }}>Medical Information</h2>
             <div style={{ display: 'grid', gap: '16px' }}>
               <Field label="Known Allergies" value={patient.allergies} />
@@ -381,7 +381,7 @@ export default function PatientDetailPage() {
             </div>
           </div>
           {activeAdmission && (
-            <div className="card" style={{ border: '1px solid rgba(59,130,246,0.3)', background: 'linear-gradient(135deg, var(--bg-card), rgba(59,130,246,0.04))' }}>
+            <div className="card" style={{ padding: '24px', border: '1px solid rgba(59,130,246,0.3)', background: 'linear-gradient(135deg, var(--bg-card), rgba(59,130,246,0.04))' }}>
               <h2 style={{ margin: '0 0 14px', fontSize: '0.95rem', fontWeight: 700, color: 'var(--accent-blue)', display: 'flex', alignItems: 'center', gap: '7px' }}>
                 <ClipboardList size={15} /> Current Admission
               </h2>
@@ -577,7 +577,7 @@ export default function PatientDetailPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               {claims.map((claim: JourneyClaim) => {
                 return (
-                  <div key={claim.id} className="card">
+                  <div key={claim.id} className="card" style={{ padding: '20px' }}>
                     {/* Claim header */}
                     <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '14px' }}>
                       <div>

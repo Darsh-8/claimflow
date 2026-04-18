@@ -1,0 +1,44 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: claimflow-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: claimflow
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: claimflow-backend
+    ports:
+      - "8000:8000"
+    environment:
+      # Override the DB URL to point to the docker-compose postgres service
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/claimflow
+      - UPLOAD_DIR=/app/uploads
+    volumes:
+      - ./backend/uploads:/app/uploads
+    depends_on:
+      - db
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: claimflow-frontend
+    ports:
+      - "5173:80"   # Maps host port 5173 to container port 80 (Nginx)
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

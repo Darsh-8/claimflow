@@ -57,12 +57,195 @@ async def _run_extraction_step(db: Session, claim: Claim, all_raw_text: list[str
     fields_data = extraction_result.get("fields", {})
     patient = fields_data.get("patient", {})
     policy = fields_data.get("policy", {})
-    if patient.get("name"): claim.patient_name = patient["name"]
+
+    # Only set patient_name from OCR if one wasn't already provided (e.g. from HMS patient tab).
+    # This preserves the authoritative HMS name so the patient override step can look it up correctly.
+    if patient.get("name") and not claim.patient_name:
+        claim.patient_name = patient["name"]
+
     if policy.get("policy_number"): claim.policy_number = policy["policy_number"]
 
     claim.status = ClaimStatus.EXTRACTED
     db.commit()
     return extraction_result
+
+
+
+def _apply_hms_patient_override(db: Session, claim: Claim) -> bool:
+    """
+    If the claim's patient_name matches an HMS patient record, overwrite
+    all extracted patient fields with authoritative HMS data, and also
+    inject clinical/financial data from the patient's most recent admission
+    and invoice.
+
+    Fields injected with is_manually_corrected=True and confidence=1.0 to
+    signal they are verified ground-truth values (shown as ✅ in the UI).
+
+    Returns True if override was applied.
+    """
+    if not claim.patient_name:
+        return False
+
+    try:
+        from models.hms_models import Patient as HMSPatient, Admission, Doctor, Ward, Invoice
+    except ImportError:
+        logger.warning("HMS models not available — skipping patient override.")
+        return False
+
+    # Case-insensitive exact name match
+    hms_patient = (
+        db.query(HMSPatient)
+        .filter(HMSPatient.name.ilike(claim.patient_name.strip()))
+        .filter(HMSPatient.is_active == True)
+        .first()
+    )
+
+    if not hms_patient:
+        logger.info(f"No HMS patient matched name '{claim.patient_name}' for claim {claim.id}.")
+        return False
+
+    logger.info(
+        f"HMS patient override: claim {claim.id} → patient_id={hms_patient.id} "
+        f"name='{hms_patient.name}'"
+    )
+
+    # Always set authoritative name on the claim itself
+    claim.patient_name = hms_patient.name
+
+    # -- 1. Demographic fields from Patient --
+    patient_fields = [
+        ("patient", "patient.name",              str(hms_patient.name)),
+        ("patient", "patient.age",               str(hms_patient.age)              if hms_patient.age               else None),
+        ("patient", "patient.gender",            hms_patient.gender                 if hms_patient.gender            else None),
+        ("patient", "patient.blood_group",       hms_patient.blood_group            if hms_patient.blood_group       else None),
+        ("patient", "patient.phone",             hms_patient.phone                  if hms_patient.phone             else None),
+        ("patient", "patient.email",             hms_patient.email                  if hms_patient.email             else None),
+        ("patient", "patient.address",           hms_patient.address                if hms_patient.address           else None),
+        ("patient", "patient.emergency_contact", hms_patient.emergency_contact      if hms_patient.emergency_contact else None),
+        ("clinical", "clinical.known_allergies", hms_patient.allergies              if hms_patient.allergies         else None),
+        ("clinical", "clinical.medical_history", hms_patient.medical_history        if hms_patient.medical_history   else None),
+    ]
+
+    # -- 2. Most recent admission (prefer active, fall back to latest) --
+    active_admission = (
+        db.query(Admission)
+        .filter(Admission.patient_id == hms_patient.id, Admission.status == "admitted")
+        .order_by(Admission.created_at.desc())
+        .first()
+    )
+    latest_admission = active_admission or (
+        db.query(Admission)
+        .filter(Admission.patient_id == hms_patient.id)
+        .order_by(Admission.created_at.desc())
+        .first()
+    )
+
+    admission_fields = []
+    if latest_admission:
+        # Doctor info
+        doctor = db.query(Doctor).filter(Doctor.id == latest_admission.doctor_id).first() if latest_admission.doctor_id else None
+        # Ward info
+        ward = db.query(Ward).filter(Ward.id == latest_admission.ward_id).first() if latest_admission.ward_id else None
+
+        admission_fields = [
+            ("clinical",  "clinical.diagnosis",         latest_admission.diagnosis   if latest_admission.diagnosis   else None),
+            ("clinical",  "clinical.doctor_name",       doctor.name                  if doctor                       else None),
+            ("clinical",  "clinical.doctor_specialization", doctor.specialization    if doctor and doctor.specialization else None),
+            ("hospital",  "hospital.doctor_name",       doctor.name                  if doctor                       else None),
+            ("hospital",  "hospital.ward",              ward.name                    if ward                         else None),
+            ("hospital",  "hospital.ward_type",         ward.ward_type               if ward                         else None),
+            ("hospital",  "hospital.bed_number",        latest_admission.bed_number  if latest_admission.bed_number  else None),
+            ("financial", "financial.admission_date",
+                latest_admission.admission_date.strftime("%Y-%m-%d") if latest_admission.admission_date else None),
+            ("financial", "financial.discharge_date",
+                (latest_admission.actual_discharge or latest_admission.expected_discharge or None)),
+        ]
+        # Format discharge date properly
+        for i, (cat, name, val) in enumerate(admission_fields):
+            if name == "financial.discharge_date" and val and not isinstance(val, str):
+                admission_fields[i] = (cat, name, val.strftime("%Y-%m-%d"))
+
+        # Also set claim-level policy_number from admission diagnosis notes if not already set
+        if latest_admission.notes and not claim.policy_number:
+            import re
+            pol_match = re.search(r'[A-Z]{2,4}[\-/]?\d{6,12}', latest_admission.notes)
+            if pol_match:
+                claim.policy_number = pol_match.group(0)
+
+    # -- 3. Most recent invoice for this patient --
+    latest_invoice = (
+        db.query(Invoice)
+        .filter(Invoice.patient_id == hms_patient.id)
+        .order_by(Invoice.created_at.desc())
+        .first()
+    )
+
+    invoice_fields = []
+    if latest_invoice:
+        invoice_fields = [
+            ("financial", "financial.total_bill_amount", f"{latest_invoice.total:.2f}"              if latest_invoice.total    else None),
+            ("financial", "financial.bill_amount",       f"{latest_invoice.total:.2f}"              if latest_invoice.total    else None),
+            ("financial", "financial.paid_amount",       f"{latest_invoice.paid_amount:.2f}"        if latest_invoice.paid_amount else None),
+            ("financial", "financial.outstanding_amount",f"{(latest_invoice.total - latest_invoice.paid_amount):.2f}" if latest_invoice.total else None),
+            ("financial", "financial.invoice_number",    latest_invoice.invoice_number              if latest_invoice.invoice_number else None),
+        ]
+
+    mismatches = []
+    
+    # -- 4. Upsert all fields --
+    all_fields = patient_fields + admission_fields + invoice_fields
+    for category, field_name, value in all_fields:
+        if value is None:
+            continue
+
+        existing = (
+            db.query(ExtractedField)
+            .filter(
+                ExtractedField.claim_id == claim.id,
+                ExtractedField.field_category == category,
+                ExtractedField.field_name == field_name,
+            )
+            .first()
+        )
+        if existing:
+            # Record mismatch if OCR value differs from HMS ground truth
+            # We specifically care about demographic mismatch for fraud alerting
+            if category == "patient" and existing.field_value:
+                ocr_val = str(existing.field_value).strip().lower()
+                hms_val = str(value).strip().lower()
+                if ocr_val and ocr_val != hms_val:
+                    mismatches.append({
+                        "field": field_name,
+                        "document": existing.field_value,
+                        "hms": value
+                    })
+
+            existing.field_value = value
+            existing.confidence = 1.0
+            existing.is_manually_corrected = True
+        else:
+            db.add(ExtractedField(
+                claim_id=claim.id,
+                field_category=category,
+                field_name=field_name,
+                field_value=value,
+                confidence=1.0,
+                is_manually_corrected=True,
+            ))
+
+    if mismatches:
+        db.add(ExtractedField(
+            claim_id=claim.id,
+            field_category="fraud",
+            field_name="hms_demographic_mismatch",
+            field_value=json.dumps(mismatches),
+            confidence=1.0,
+            is_manually_corrected=True,
+        ))
+
+    db.commit()
+    return True
+
 
 
 async def _run_comprehend_step(db: Session, claim: Claim, extraction_result: dict):
@@ -134,6 +317,30 @@ async def run_extraction_pipeline(claim_id: int, db_session_factory):
 
         try:
             extraction_result = await _run_extraction_step(db, claim, all_raw_text)
+
+            # Override extracted patient fields with authoritative HMS data
+            # This ensures OCR errors (e.g. wrong patient name in document) are corrected
+            try:
+                overridden = _apply_hms_patient_override(db, claim)
+                if overridden:
+                    logger.info(f"HMS patient data applied to claim {claim_id}.")
+                    # Rebuild extraction_result from the now-corrected DB fields so that
+                    # the summary and subsequent steps use HMS ground-truth data, not OCR text.
+                    corrected_fields = db.query(ExtractedField).filter(
+                        ExtractedField.claim_id == claim_id
+                    ).all()
+                    rebuilt = {"fields": {}}
+                    for f in corrected_fields:
+                        if f.field_name.startswith("comprehend_icd10_"):
+                            continue
+                        cat = f.field_category
+                        # field_name is like "patient.name" → key is "name"
+                        key = f.field_name.split(".", 1)[-1] if "." in f.field_name else f.field_name
+                        rebuilt["fields"].setdefault(cat, {})[key] = f.field_value
+                    extraction_result = rebuilt
+            except Exception as e:
+                logger.warning(f"HMS patient override failed (non-fatal): {e}")
+
             await manager.send_personal_message({
                 "type": "CLAIM_STATUS", "message": f"Document data extracted for claim #{claim_id}",
                 "claim_id": claim_id, "status": "EXTRACTED"
@@ -143,6 +350,7 @@ async def run_extraction_pipeline(claim_id: int, db_session_factory):
             claim.status = ClaimStatus.ERROR
             db.commit()
             return
+
 
         try: await _run_comprehend_step(db, claim, extraction_result)
         except Exception as e: logger.exception(f"Comprehend failed: {e}")

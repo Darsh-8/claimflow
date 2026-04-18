@@ -1,4 +1,9 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+@import "tailwindcss";
+
+svg {
+  display: inline-block;
+}
 
 :root {
   /* Light theme palette matching LILY HMS reference */
@@ -197,6 +202,18 @@ a {
   background: var(--accent-light);
   color: var(--accent-blue);
   font-weight: 600;
+}
+
+.nav-link-accent {
+  background: var(--accent-blue);
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.25);
+}
+
+.nav-link-accent:hover {
+  background: #2563EB;
+  color: #fff;
 }
 
 .sidebar-footer {
@@ -961,4 +978,64 @@ select {
   .topbar {
     padding: 0 16px;
   }
+}
+
+/* === UPLOAD PAGE === */
+.pipeline-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 24px;
+  box-shadow: var(--shadow-sm);
+}
+
+.pipeline-step {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.pipeline-step:last-child {
+  margin-bottom: 0;
+}
+
+.pipeline-step-num {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--accent-light);
+  color: var(--accent-blue);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-weight: 700;
+}
+
+.pipeline-step-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+}
+
+.pipeline-step-desc {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.format-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.format-pill {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 100px;
+  background: var(--border-subtle);
+  color: var(--text-secondary);
 }

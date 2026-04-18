@@ -50,6 +50,7 @@ from .patient_history_rules import (
     rule_patient_hospital_hopping,
     rule_repeat_diagnosis_abuse,
     rule_age_procedure_mismatch,
+    rule_hms_demographic_mismatch,
 )
 from .irdai_rules import (
     rule_missing_mandatory_documents,
@@ -111,6 +112,7 @@ ALL_RULES = [
     rule_patient_hospital_hopping,
     rule_repeat_diagnosis_abuse,
     rule_age_procedure_mismatch,
+    rule_hms_demographic_mismatch,
     # IRDAI Compliance
     rule_missing_mandatory_documents,
     rule_pre_authorization_violation,

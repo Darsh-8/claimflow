@@ -4,7 +4,7 @@ import claimsApi from '../client/apiClient'; // the initialized axios instance
 
 interface User {
     username: string;
-    role: 'HOSPITAL' | 'INSURER';
+    role: 'HOSPITAL' | 'INSURER' | 'ADMIN';
 }
 
 interface AuthContextType {

@@ -3,7 +3,7 @@ from pathlib import Path
 
 
 class Settings(BaseSettings):
-    DATABASE_URL: str = "sqlite:///./claimflow.db"
+    DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/claimflow"
     UPLOAD_DIR: str = "./uploads"
     # Novita AI (primary extraction / summary LLM)
     KIMI_API_KEY: str = ""

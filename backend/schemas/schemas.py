@@ -195,6 +195,20 @@ class ComprehendICD10Response(BaseModel):
     source: str = "aws_comprehend_medical"  # or "cached"
 
 
+class ICD10SuggestRequest(BaseModel):
+    text: str
+
+
+class ICD10SuggestItem(BaseModel):
+    code: str
+    description: str
+    score: float
+
+
+class ICD10SuggestResponse(BaseModel):
+    suggestions: list[ICD10SuggestItem]
+
+
 # --- Patient History ---
 
 class PatientHistoryClaim(BaseModel):

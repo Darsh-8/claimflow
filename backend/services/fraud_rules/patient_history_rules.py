@@ -253,3 +253,36 @@ def rule_age_procedure_mismatch(claim_context: dict) -> Optional[RuleResult]:
         )
 
     return None
+
+import json
+
+def rule_hms_demographic_mismatch(claim_context: dict) -> Optional[RuleResult]:
+    """
+    PAT_H06 — HMS Demographic Mismatch
+    If: The OCR extracted patient name, age, or gender from the uploaded
+    documents differs from the ground truth HMS record for this patient.
+    """
+    fields = claim_context.get("fields", {})
+    mismatch_json = fields.get(("fraud", "hms_demographic_mismatch"))
+    
+    if not mismatch_json:
+        return None
+
+    try:
+        mismatches = json.loads(mismatch_json)
+        if not mismatches:
+            return None
+            
+        mismatch_desc = ", ".join(
+            f"{m['field'].split('.')[-1]} (Doc: '{m['document']}' vs HMS: '{m['hms']}')" 
+            for m in mismatches[:3]
+        )
+        
+        return RuleResult(
+            rule_id="PAT_H06",
+            severity="HIGH",
+            score=35,
+            reason=f"Identity mismatch: The uploaded documents have conflicting data versus the HMS record for {len(mismatches)} demographic fields. Details: {mismatch_desc}."
+        )
+    except Exception:
+        return None

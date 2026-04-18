@@ -11,6 +11,7 @@ from routes import auth as auth_router
 from routes import users as users_router
 from routes import notifications as notifications_router
 from routes import hms as hms_router
+from routes import admin as admin_router
 from middleware.logging_middleware import RequestLoggingMiddleware
 
 # Bootstrap the application logger (singleton — safe to call multiple times)
@@ -63,6 +64,7 @@ app.include_router(claims_router.router)
 app.include_router(users_router.router)
 app.include_router(notifications_router.router)
 app.include_router(hms_router.router)
+app.include_router(admin_router.router)
 
 
 @app.get("/")

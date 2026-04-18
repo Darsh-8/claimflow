@@ -49,7 +49,7 @@ export default function LoginPage() {
                             ClaimFlow
                         </h1>
                     </div>
-                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>Automated Medical Adjudication Engine</p>
+                    {/* <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>Automated Medical Adjudication Engine</p> */}
                 </div>
 
                 {error && (
@@ -101,7 +101,14 @@ export default function LoginPage() {
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', background: '#f8fafc', padding: '8px', borderRadius: '6px' }}>
                             <Building2 size={16} color="var(--purple)" />
-                            <div><strong>Insurer Role:</strong> demo_insurer / password123</div>
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                <span><strong>Insurer 1:</strong> demo_insurer / password123</span>
+                                <span><strong>Insurer 2:</strong> demo_insurer_2 / password123</span>
+                            </div>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', background: '#f8fafc', padding: '8px', borderRadius: '6px' }}>
+                            <ShieldCheck size={16} color="var(--error)" />
+                            <div><strong>Admin Role:</strong> admin / admin123</div>
                         </div>
                     </div>
                 </div>

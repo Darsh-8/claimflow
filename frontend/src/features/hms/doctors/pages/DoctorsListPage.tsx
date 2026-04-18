@@ -257,7 +257,7 @@ export default function DoctorsListPage() {
               key={d.id}
               className="card"
               onClick={() => setQuickView(d)}
-              style={{ cursor: 'pointer', transition: 'transform 120ms, box-shadow 120ms', borderTop: `3px solid ${deptColor(d.department)}` }}
+              style={{ padding: '16px', cursor: 'pointer', transition: 'transform 120ms, box-shadow 120ms', borderTop: `3px solid ${deptColor(d.department)}` }}
               onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-2px)'; (e.currentTarget as HTMLDivElement).style.boxShadow = 'var(--shadow-md)'; }}
               onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.transform = ''; (e.currentTarget as HTMLDivElement).style.boxShadow = ''; }}
             >
