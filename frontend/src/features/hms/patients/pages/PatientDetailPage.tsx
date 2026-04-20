@@ -81,8 +81,11 @@ function DocPreviewModal({ doc, claimId, onClose }: { doc: JourneyClaimDocument;
   const isImage = doc.mime_type?.startsWith('image/') || /\.(jpg|jpeg|png|tiff|bmp)$/i.test(doc.original_filename);
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 1100, display: 'flex', flexDirection: 'column', padding: '20px' }}
-      onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+    <div
+      role="presentation"
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 1100, display: 'flex', flexDirection: 'column', padding: '20px' }}
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+      onKeyDown={e => { if (e.key === 'Escape') onClose(); }}>
       <div style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius)', display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden', maxWidth: '900px', margin: '0 auto', width: '100%' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', borderBottom: '1px solid var(--border)' }}>
           <div>

@@ -80,8 +80,10 @@ function WardFormModal({
 
   return (
     <div
+      role="presentation"
       style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}
       onClick={e => e.target === e.currentTarget && onClose()}
+      onKeyDown={e => { if (e.key === 'Escape') onClose(); }}
     >
       <div style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-lg)', padding: '0', width: '100%', maxWidth: '560px', boxShadow: 'var(--shadow-lg)', overflow: 'hidden', animation: 'scaleIn 180ms ease' }}>
         {/* Modal header */}

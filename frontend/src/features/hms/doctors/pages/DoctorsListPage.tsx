@@ -38,8 +38,10 @@ function DoctorQuickView({
 }) {
   return createPortal(
     <div
+      role="presentation"
       style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+      onKeyDown={e => { if (e.key === 'Escape') onClose(); }}
     >
       <div style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius)', width: '100%', maxWidth: '480px', boxShadow: 'var(--shadow-lg)', overflow: 'hidden' }}>
         {/* Header strip */}
@@ -256,7 +258,10 @@ export default function DoctorsListPage() {
             <div
               key={d.id}
               className="card"
+              role="button"
+              tabIndex={0}
               onClick={() => setQuickView(d)}
+              onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') setQuickView(d); }}
               style={{ padding: '16px', cursor: 'pointer', transition: 'transform 120ms, box-shadow 120ms', borderTop: `3px solid ${deptColor(d.department)}` }}
               onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-2px)'; (e.currentTarget as HTMLDivElement).style.boxShadow = 'var(--shadow-md)'; }}
               onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.transform = ''; (e.currentTarget as HTMLDivElement).style.boxShadow = ''; }}
