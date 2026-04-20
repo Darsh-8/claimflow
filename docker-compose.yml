@@ -35,7 +35,7 @@ services:
       dockerfile: Dockerfile
     container_name: claimflow-frontend
     ports:
-      - "5173:80"   # Maps host port 5173 to container port 80 (Nginx)
+      - "5173:8080"   # Maps host port 5173 to container port 8080 (Nginx)
     depends_on:
       - backend
     restart: unless-stopped
