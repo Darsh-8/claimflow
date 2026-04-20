@@ -14,7 +14,7 @@ COPY . .
 RUN npm run build
 
 # Serving stage
-FROM nginxinc/nginx-unprivileged:alpine
+FROM nginx:alpine
 
 # Copy built assets from builder stage
 COPY --from=builder /app/dist /usr/share/nginx/html
@@ -22,7 +22,7 @@ COPY --from=builder /app/dist /usr/share/nginx/html
 # Replace default NGINX config with one configured for Single Page Applications
 # This ensures that deep links are routed back to index.html
 RUN echo 'server { \
-    listen 8080; \
+    listen 80; \
     location / { \
         root   /usr/share/nginx/html; \
         index  index.html index.htm; \
@@ -30,6 +30,6 @@ RUN echo 'server { \
     } \
 }' > /etc/nginx/conf.d/default.conf
 
-EXPOSE 8080
+EXPOSE 80
 
 CMD ["nginx", "-g", "daemon off;"]

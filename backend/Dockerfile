@@ -21,9 +21,5 @@ COPY . .
 # Expose port
 EXPOSE 8000
 
-# Create an unprivileged user and assign permissions
-RUN useradd -m appuser && chown -R appuser /app
-USER appuser
-
 # Command to run the application
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

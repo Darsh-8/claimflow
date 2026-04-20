@@ -107,7 +107,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
           const data = JSON.parse(event.data);
 
           const newNotification: Notification = {
-            id: data.notification_id ? `db-${data.notification_id}` : crypto.randomUUID(),
+            id: data.notification_id ? `db-${data.notification_id}` : Math.random().toString(36).substring(2, 9),
             db_id: data.notification_id,
             type: data.type,
             message: data.message,
