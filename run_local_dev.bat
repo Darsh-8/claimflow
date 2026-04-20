@@ -3,6 +3,7 @@ echo ==============================================
 echo       ClaimFlow - Local Development Mode
 echo ==============================================
 
+echo.
 echo Starting the PostgreSQL Database via Docker...
 docker-compose up -d db
 
