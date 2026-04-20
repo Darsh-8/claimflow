@@ -5,6 +5,8 @@ import { toast } from 'sonner';
 import { usePatients } from '../hooks/usePatients';
 import { patientsApi } from '../api/patientsApi';
 import PatientForm from '../components/PatientForm';
+import { SearchInput } from '../../../components/SearchInput';
+import { EmptyState } from '../../../components/EmptyState';
 import type { PatientCreate } from '../../types';
 
 const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
@@ -93,12 +95,8 @@ export default function PatientsListPage() {
       )}
 
       {/* Search + Filters */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '8px 14px', marginBottom: '10px' }}>
-        <Search size={15} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-        <input
-          type="text" placeholder="Search by name, phone, email…" value={search} onChange={e => setSearch(e.target.value)}
-          style={{ border: 'none', background: 'transparent', outline: 'none', flex: 1, fontSize: '0.875rem', color: 'var(--text-primary)' }}
-        />
+      <div style={{ marginBottom: '10px' }}>
+        <SearchInput value={search} onChange={setSearch} placeholder="Search by name, phone, email…" />
       </div>
 
       {/* Filter panel */}
@@ -162,48 +160,39 @@ export default function PatientsListPage() {
       )}
       {error && <div className="validation-item validation-error" style={{ marginBottom: '16px' }}>{error}</div>}
       {!loading && !error && filtered.length === 0 && (
-        <div style={{ textAlign: 'center', padding: '60px', color: 'var(--text-muted)' }}>
-          <UserX size={40} style={{ marginBottom: '12px', opacity: 0.4 }} />
-          <p style={{ margin: 0 }}>{search || hasActiveFilters ? 'No patients match your filters.' : 'No patients yet. Register one to get started.'}</p>
-        </div>
+        <EmptyState icon={UserX} message={search || hasActiveFilters ? 'No patients match your filters.' : 'No patients yet. Register one to get started.'} />
       )}
 
       {!loading && filtered.length > 0 && (
         <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <table className="data-table">
             <thead>
-              <tr style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-page)' }}>
+              <tr>
                 {['Name', 'Age / Gender', 'Blood Group', 'Phone', 'Email', 'Status', ''].map(h => (
-                  <th key={h} style={{ padding: '10px 16px', textAlign: 'left', fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)' }}>{h}</th>
+                  <th key={h}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {filtered.map(p => (
-                <tr
-                  key={p.id}
-                  style={{ borderBottom: '1px solid var(--border)', cursor: 'pointer', transition: 'background 150ms' }}
-                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-page)')}
-                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                  onClick={() => navigate(`/hms/patients/${p.id}`)}
-                >
-                  <td style={{ padding: '12px 16px', fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.875rem' }}>{p.name}</td>
-                  <td style={{ padding: '12px 16px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                <tr key={p.id} onClick={() => navigate(`/hms/patients/${p.id}`)}>
+                  <td style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{p.name}</td>
+                  <td style={{ color: 'var(--text-secondary)' }}>
                     {p.age ? `${p.age} yrs` : '—'}{p.gender ? ` · ${p.gender}` : ''}
                   </td>
-                  <td style={{ padding: '12px 16px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                  <td style={{ color: 'var(--text-secondary)' }}>
                     {p.blood_group
                       ? <span style={{ background: 'var(--error-bg)', color: 'var(--error)', padding: '2px 7px', borderRadius: '6px', fontWeight: 700, fontSize: '0.75rem' }}>{p.blood_group}</span>
                       : '—'}
                   </td>
-                  <td style={{ padding: '12px 16px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{p.phone || '—'}</td>
-                  <td style={{ padding: '12px 16px', fontSize: '0.82rem', color: 'var(--text-muted)' }}>{p.email || '—'}</td>
-                  <td style={{ padding: '12px 16px' }}>
+                  <td style={{ color: 'var(--text-secondary)' }}>{p.phone || '—'}</td>
+                  <td style={{ color: 'var(--text-muted)' }}>{p.email || '—'}</td>
+                  <td>
                     <span style={{ fontSize: '0.7rem', fontWeight: 700, padding: '2px 8px', borderRadius: '100px', background: p.is_active ? 'var(--success-bg)' : 'var(--error-bg)', color: p.is_active ? 'var(--success)' : 'var(--error)' }}>
                       {p.is_active ? 'Active' : 'Inactive'}
                     </span>
                   </td>
-                  <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                  <td style={{ textAlign: 'right' }}>
                     <span style={{ fontSize: '0.8rem', color: 'var(--accent-blue)' }}>View →</span>
                   </td>
                 </tr>

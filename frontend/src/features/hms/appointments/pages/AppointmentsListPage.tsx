@@ -3,6 +3,8 @@ import { Plus, Loader2, Calendar, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { appointmentsApi } from '../api/appointmentsApi';
 import AppointmentForm from '../components/AppointmentForm';
+import { SearchInput } from '../../../components/SearchInput';
+import { EmptyState } from '../../../components/EmptyState';
 import type { Appointment, AppointmentCreate } from '../../types';
 
 const STATUS_STYLE: Record<string, { bg: string; color: string }> = {
@@ -125,11 +127,7 @@ export default function AppointmentsListPage() {
 
       {/* Filters */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '14px', flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '7px 12px', flex: 1, minWidth: '200px' }}>
-          <Search size={14} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-          <input type="text" placeholder="Search patient, doctor, reason…" value={search} onChange={e => setSearch(e.target.value)}
-            style={{ border: 'none', background: 'transparent', outline: 'none', flex: 1, fontSize: '0.875rem', color: 'var(--text-primary)' }} />
-        </div>
+        <SearchInput value={search} onChange={setSearch} placeholder="Search patient, doctor, reason…" />
         <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
           {[{ v: '', label: 'All' }, { v: 'scheduled', label: 'Scheduled' }, { v: 'completed', label: 'Completed' }, { v: 'cancelled', label: 'Cancelled' }].map(opt => (
             <button key={opt.v} onClick={() => setStatusFilter(opt.v)}
@@ -147,34 +145,29 @@ export default function AppointmentsListPage() {
       )}
       {error && <div className="validation-item validation-error" style={{ marginBottom: '16px' }}>{error}</div>}
       {!loading && !error && filtered.length === 0 && (
-        <div style={{ textAlign: 'center', padding: '60px', color: 'var(--text-muted)' }}>
-          <Calendar size={40} style={{ marginBottom: '12px', opacity: 0.4 }} />
-          <p style={{ margin: 0 }}>No appointments found.</p>
-        </div>
+        <EmptyState icon={Calendar} message="No appointments found." />
       )}
 
       {!loading && filtered.length > 0 && (
         <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <table className="data-table">
             <thead>
-              <tr style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-page)' }}>
+              <tr>
                 {['Patient', 'Doctor', 'Date & Time', 'Type', 'Reason', 'Status', ''].map(h => (
-                  <th key={h} style={{ padding: '10px 16px', textAlign: 'left', fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)' }}>{h}</th>
+                  <th key={h}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {filtered.map(a => (
-                <tr key={a.id} style={{ borderBottom: '1px solid var(--border)' }}
-                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-page)')}
-                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                  <td style={{ padding: '12px 16px', fontWeight: 600, fontSize: '0.875rem', color: 'var(--text-primary)' }}>{a.patient_name ?? `#${a.patient_id}`}</td>
-                  <td style={{ padding: '12px 16px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{a.doctor_name ?? `#${a.doctor_id}`}</td>
-                  <td style={{ padding: '12px 16px', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>{fmtDateTime(a.appointment_date)}</td>
-                  <td style={{ padding: '12px 16px', fontSize: '0.82rem', color: 'var(--text-muted)' }}>{a.appointment_type}</td>
-                  <td style={{ padding: '12px 16px', fontSize: '0.82rem', color: 'var(--text-muted)', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.reason || '—'}</td>
-                  <td style={{ padding: '12px 16px' }}>{statusBadge(a.status)}</td>
-                  <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                <tr key={a.id}>
+                  <td style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{a.patient_name ?? `#${a.patient_id}`}</td>
+                  <td style={{ color: 'var(--text-secondary)' }}>{a.doctor_name ?? `#${a.doctor_id}`}</td>
+                  <td style={{ color: 'var(--text-secondary)' }}>{fmtDateTime(a.appointment_date)}</td>
+                  <td style={{ color: 'var(--text-muted)' }}>{a.appointment_type}</td>
+                  <td style={{ color: 'var(--text-muted)', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.reason || '—'}</td>
+                  <td>{statusBadge(a.status)}</td>
+                  <td style={{ textAlign: 'right' }}>
                     {a.status === 'scheduled' && (
                       <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
                         <button onClick={() => handleComplete(a)} className="btn btn-secondary" style={{ fontSize: '0.75rem', padding: '3px 8px', color: 'var(--success)', borderColor: 'var(--success)' }}>Complete</button>
